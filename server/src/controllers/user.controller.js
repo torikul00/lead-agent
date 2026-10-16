@@ -3,6 +3,7 @@ import User from '../models/user.model.js';
 import VerificationCode from '../models/verificationCode.model.js';
 import { AUTH_COOKIE_NAME, getAuthCookieOptions } from '../../config/authCookie.js';
 import { sendVerificationEmail } from '../../utils/sendEmail.js';
+import { deleteFromR2, keyFromPublicUrl } from '../../utils/r2.js';
 
 const MAX_VERIFICATION_ATTEMPTS = 5;
 const RESEND_COOLDOWN_SECONDS = 60;
@@ -159,6 +160,12 @@ export const updateMe = async (req, res) => {
             new: true,
             runValidators: true,
         });
+
+        // Remove the old photo from R2 once the new one is saved
+        if (req.file && req.user.avatar) {
+            await deleteFromR2(keyFromPublicUrl(req.user.avatar));
+        }
+
         return res.status(200).json({ user: sanitizeUser(user) });
     } catch (err) {
         return res.status(500).json({ error: err.message });

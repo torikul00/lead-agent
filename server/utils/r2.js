@@ -24,7 +24,16 @@ export const r2Client = new S3Client({
    },
 });
 
-
+/**
+ * Builds an object key that mirrors the folder layout previously used on
+ * local disk: <subdir>/[<batchId>/]<prefix><timestamp>-<random><ext>
+ *
+ * @param {Object} opts
+ * @param {string} opts.subdir — top-level "folder", e.g. `avatar`, `resources`
+ * @param {string|number} [opts.batchId] — nests the key one level deeper, e.g. `resources/<batchId>/...`
+ * @param {string} [opts.prefix] — filename prefix, e.g. `avatar-`
+ * @param {string} [opts.originalname] — original uploaded filename, used only for its extension
+ */
 export function buildObjectKey({ subdir, batchId, prefix = "", originalname = "" }) {
    const ext = path.extname(originalname);
    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
@@ -37,13 +46,20 @@ export function publicUrlForKey(key) {
    return `${PUBLIC_BASE}/${key}`;
 }
 
-
+/** Recovers the object key from a URL previously built by `publicUrlForKey`. */
 export function keyFromPublicUrl(url) {
    if (!url || !PUBLIC_BASE || !url.startsWith(`${PUBLIC_BASE}/`)) return null;
    return url.slice(PUBLIC_BASE.length + 1);
 }
 
-
+/**
+ * Uploads a buffer to the R2 bucket under `key` and returns its public URL.
+ *
+ * @param {Object} opts
+ * @param {Buffer} opts.buffer
+ * @param {string} opts.key
+ * @param {string} [opts.contentType]
+ */
 export async function uploadBufferToR2({ buffer, key, contentType }) {
    await r2Client.send(
       new PutObjectCommand({

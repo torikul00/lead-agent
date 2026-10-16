@@ -20,7 +20,7 @@ export default function InputField({ label, icon: Icon, error, id, type = 'text'
                     id={id}
                     type={isPassword && showPassword ? 'text' : type}
                     aria-invalid={!!error}
-                    className={`w-full rounded-xl border bg-white py-3 pl-11 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:ring-4 ${error ? 'border-red-500 focus:ring-red-500/15' : 'border-slate-200 focus:border-primary focus:ring-primary/15'} ${isPassword ? 'pr-11' : 'pr-4'}`}
+                    className={`w-full rounded-xl border bg-white py-3 pl-11 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:ring-4 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500 ${error ? 'border-red-500 focus:ring-red-500/15' : 'border-slate-200 focus:border-primary focus:ring-primary/15'} ${isPassword ? 'pr-11' : 'pr-4'}`}
                     {...props}
                 />
                 {isPassword && (
