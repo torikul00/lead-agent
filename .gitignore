@@ -26,3 +26,7 @@ config.bat
 
 # Local DB dumps (server runs with cwd = server/)
 server/backups/
+
+# Environment files (client and server)
+.env*
+!.env.example

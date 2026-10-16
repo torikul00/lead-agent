@@ -1,7 +1,11 @@
 import jwt from 'jsonwebtoken';
 import { isValidObjectId } from 'mongoose';
 import User from '../models/user.model.js';
+import VerificationCode from '../models/verificationCode.model.js';
 import { AUTH_COOKIE_NAME, getAuthCookieOptions } from '../../config/authCookie.js';
+import { sendVerificationEmail } from '../../utils/sendEmail.js';
+
+const MAX_VERIFICATION_ATTEMPTS = 5;
 
 // Build a signed JWT. authMiddleware reads `decoded.payload`, so keep it nested.
 const signToken = (user) =>
@@ -24,9 +28,10 @@ const sanitizeUser = (user) => ({
     phone: user.phone,
     avatar: user.avatar,
     role: user.role,
+    is_email_verified: user.is_email_verified,
 });
 
-// POST /api/user/register — create user and log them in automatically.
+// POST /api/user/register — create user and email them a verification code.
 export const registerUser = async (req, res) => {
     try {
         const { full_name, email, phone, password } = req.body;
@@ -43,8 +48,88 @@ export const registerUser = async (req, res) => {
         // password is hashed by the model's pre-save hook
         const user = await User.create({ full_name, email, phone, password });
 
+        try {
+            const code = await VerificationCode.createForUser(user._id);
+            await sendVerificationEmail(user.email, code);
+        } catch {
+            // Remove the account so the user can register again
+            await User.deleteOne({ _id: user._id });
+            await VerificationCode.deleteOne({ user_id: user._id });
+            return res.status(500).json({ error: 'Could not send verification email. Please try again.' });
+        }
+
+        return res.status(201).json({
+            message: 'Account created. Check your email for the verification code.',
+            email: user.email,
+        });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+};
+
+// POST /api/users/verify_email — check the 6-digit code and log the user in.
+export const verifyEmail = async (req, res) => {
+    try {
+        const { email, code } = req.body;
+
+        if (!email || !code) {
+            return res.status(400).json({ error: 'Email and code are required' });
+        }
+
+        const user = await User.findOne({ email: email.toLowerCase() });
+        if (!user) {
+            return res.status(400).json({ error: 'Invalid verification code' });
+        }
+        if (user.is_email_verified) {
+            return res.status(400).json({ error: 'Email is already verified' });
+        }
+
+        const verification = await VerificationCode.findOne({ user_id: user._id });
+        if (!verification || verification.expires_at < new Date()) {
+            return res.status(400).json({ error: 'Code has expired. Please request a new one.' });
+        }
+        if (verification.attempts >= MAX_VERIFICATION_ATTEMPTS) {
+            return res.status(429).json({ error: 'Too many attempts. Please request a new code.' });
+        }
+
+        if (!verification.compareCode(code)) {
+            verification.attempts += 1;
+            await verification.save();
+            return res.status(400).json({ error: 'Invalid verification code' });
+        }
+
+        user.is_email_verified = true;
+        await user.save();
+        await verification.deleteOne();
+
         setAuthCookie(res, user);
-        return res.status(201).json({ user: sanitizeUser(user) });
+        return res.status(200).json({ user: sanitizeUser(user) });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+};
+
+// POST /api/users/resend_verification — send a fresh code to an unverified user.
+export const resendVerificationCode = async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({ error: 'Email is required' });
+        }
+
+        const user = await User.findOne({ email: email.toLowerCase() });
+        if (!user) {
+            return res.status(404).json({ error: 'Account not found' });
+        }
+        if (user.is_email_verified) {
+            return res.status(400).json({ error: 'Email is already verified' });
+        }
+
+        const code = await VerificationCode.createForUser(user._id);
+        await sendVerificationEmail(user.email, code);
+
+        return res.status(200).json({ message: 'A new verification code has been sent to your email.' });
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }
@@ -68,6 +153,13 @@ export const loginUser = async (req, res) => {
         if (user.is_active === false) {
             return res.status(403).json({
                 error: 'Your account has been deactivated. Please contact support.',
+            });
+        }
+
+        if (!user.is_email_verified) {
+            return res.status(403).json({
+                error: 'Please verify your email before logging in.',
+                needs_verification: true,
             });
         }
 
