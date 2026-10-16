@@ -10,10 +10,11 @@ const features = [
 type AuthLayoutProps = {
     title: string
     subtitle: string
+    wide?: boolean
     children: ReactNode
 }
 
-export default function AuthLayout({ title, subtitle, children }: AuthLayoutProps) {
+export default function AuthLayout({ title, subtitle, wide, children }: AuthLayoutProps) {
     return (
         <div className="flex min-h-screen bg-slate-50">
             <aside className="relative hidden w-1/2 flex-col justify-between overflow-hidden bg-primary p-12 text-white lg:flex">
@@ -46,7 +47,7 @@ export default function AuthLayout({ title, subtitle, children }: AuthLayoutProp
             </aside>
 
             <main className="flex flex-1 items-center justify-center px-4 py-12 sm:px-6">
-                <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/60 sm:p-10">
+                <div className={`w-full rounded-2xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/60 sm:p-10 ${wide ? 'max-w-xl' : 'max-w-md'}`}>
                     <div className="mb-10 flex items-center gap-2.5 text-lg font-semibold text-slate-900 lg:hidden">
                         <div className="flex size-10 items-center justify-center rounded-xl bg-primary text-white">
                             <Radar className="size-5" />

@@ -3,9 +3,10 @@ import { isValidObjectId } from 'mongoose';
 import User from '../src/models/user.model.js';
 import { AUTH_COOKIE_NAME, getAuthCookieOptions } from '../config/authCookie.js';
 
-// Verify the token, then load the user fresh from the DB. We don't trust the
-// role (or anything else) baked into the token payload — only the id is used,
-// and the authoritative user record is read from the database on every request.
+// Routes an unverified user still needs so the client can show the verify popup
+const UNVERIFIED_ROUTES = ['GET /api/users/me', 'POST /api/users/verify_email', 'POST /api/users/resend_verification'];
+
+// Verify the token, then load the user fresh from the DB.
 const authMiddleware = async (req, res, next) => {
     const token = req.cookies[AUTH_COOKIE_NAME];
     if (!token) {
@@ -34,15 +35,14 @@ const authMiddleware = async (req, res, next) => {
             res.clearCookie(AUTH_COOKIE_NAME, getAuthCookieOptions());
             return res.status(401).json({ error: 'User no longer exists' });
         }
-
-        // A deactivated account loses access immediately (strict check so legacy
-        // records without the field stay active).
         if (user.is_active === false) {
             res.clearCookie(AUTH_COOKIE_NAME, getAuthCookieOptions());
             return res.status(403).json({ error: 'Your account has been deactivated' });
         }
 
-        // Trust the database record, not the token payload.
+        if (!user.is_email_verified && !UNVERIFIED_ROUTES.includes(`${req.method} ${req.baseUrl}${req.path}`)) {
+            return res.status(403).json({ error: 'Please verify your email first.', needs_verification: true });
+        }
         req.user = user;
         next();
     } catch (err) {

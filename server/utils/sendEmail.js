@@ -25,11 +25,14 @@ export const sendVerificationEmail = (to, code) =>
         subject: 'Your LeadAgent verification code',
         text: `Your LeadAgent verification code is ${code}. It expires in 10 minutes.`,
         html: `
-            <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px; color: #0f172a;">
-                <h2 style="margin: 0 0 16px; color: #047857;">Verify your email</h2>
-                <p style="margin: 0 0 24px;">Use the code below to verify your LeadAgent account.</p>
-                <div style="font-size: 32px; font-weight: bold; letter-spacing: 8px; text-align: center; padding: 16px; background: #ecfdf5; border-radius: 12px; color: #047857;">${code}</div>
-                <p style="margin: 24px 0 0; font-size: 14px; color: #64748b;">This code expires in 10 minutes. If you didn't create an account, you can ignore this email.</p>
+            <div style="background: #f1f5f9; padding: 32px 16px; font-family: Arial, Helvetica, sans-serif;">
+                <div style="max-width: 480px; margin: 0 auto; background: #ffffff; border-radius: 16px; padding: 32px; color: #0f172a;">
+                    <p style="margin: 0 0 24px; font-size: 18px; font-weight: bold; color: #047857;">LeadAgent</p>
+                    <h1 style="margin: 0 0 8px; font-size: 22px;">Verify your email</h1>
+                    <p style="margin: 0 0 24px; font-size: 15px; line-height: 1.5; color: #475569;">Enter this code to finish creating your account.</p>
+                    <div style="padding: 16px; border-radius: 12px; background: #ecfdf5; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #047857;">${code}</div>
+                    <p style="margin: 24px 0 0; font-size: 13px; line-height: 1.5; color: #64748b;">This code expires in 10 minutes. If you didn't sign up for LeadAgent, you can safely ignore this email.</p>
+                </div>
             </div>
         `,
     });

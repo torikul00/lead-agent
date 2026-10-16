@@ -10,4 +10,4 @@ export function getAuthCookieOptions() {
     };
 }
 
-export const AUTH_COOKIE_NAME = 'tech_hub_auth_token';
+export const AUTH_COOKIE_NAME = 'lead_agent_auth_token';
