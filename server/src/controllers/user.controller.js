@@ -5,6 +5,7 @@ import { AUTH_COOKIE_NAME, getAuthCookieOptions } from '../../config/authCookie.
 import { sendVerificationEmail } from '../../utils/sendEmail.js';
 
 const MAX_VERIFICATION_ATTEMPTS = 5;
+const RESEND_COOLDOWN_SECONDS = 60;
 
 // Build a signed JWT. authMiddleware reads `decoded.payload`, so keep it nested.
 const signToken = (user) => jwt.sign({ payload: { id: user._id } }, process.env.JWT_SECRET, { expiresIn: '7d' });
@@ -91,6 +92,17 @@ export const resendVerificationCode = async (req, res) => {
     try {
         if (req.user.is_email_verified) {
             return res.status(400).json({ error: 'Email is already verified' });
+        }
+
+        const existing = await VerificationCode.findOne({ user_id: req.user._id });
+        if (existing) {
+            const retryAfter = Math.ceil(RESEND_COOLDOWN_SECONDS - (Date.now() - existing.last_sent_at) / 1000);
+            if (retryAfter > 0) {
+                return res.status(429).json({
+                    error: `Please wait ${retryAfter}s before requesting a new code.`,
+                    retry_after: retryAfter,
+                });
+            }
         }
 
         await sendNewCode(req.user);

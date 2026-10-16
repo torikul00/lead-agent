@@ -20,6 +20,10 @@ const verificationCodeSchema = new Schema({
     attempts: {
         type: Number,
         default: 0,
+    },
+    last_sent_at: {
+        type: Date,
+        required: true,
     }
 }, { timestamps: true, collection: 'verification_codes' });
 
@@ -31,7 +35,7 @@ verificationCodeSchema.statics.createForUser = async function (userId) {
 
     await this.findOneAndUpdate(
         { user_id: userId },
-        { code: hashCode(code), expires_at: new Date(Date.now() + 10 * 60 * 1000), attempts: 0 },
+        { code: hashCode(code), expires_at: new Date(Date.now() + 10 * 60 * 1000), attempts: 0, last_sent_at: new Date() },
         { upsert: true }
     );
     return code;
