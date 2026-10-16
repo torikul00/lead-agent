@@ -1,19 +1,17 @@
 import rateLimit from "express-rate-limit";
 
-// General ceiling for all API traffic — generous enough for normal dashboard
-// use, just there to blunt scraping/abuse bursts.
+// 200 requests per 15 minutes for general API usage
 export const apiLimiter = rateLimit({
    windowMs: 15 * 60 * 1000,
-   limit: 1000,
+   limit: 200,
    standardHeaders: true,
    legacyHeaders: false,
    message: { error: "Too many requests. Please try again later." },
 });
 
-// Tighter limit for login/register — the endpoints most worth protecting
-// against credential-stuffing / brute-force.
+// 20 requests per 15 minutes for auth endpoints (register, login, verify email, resend verification)
 export const authLimiter = rateLimit({
-   windowMs: 15 * 60 * 1000,
+   windowMs: 15 * 60 * 1000, 
    limit: 20,
    standardHeaders: true,
    legacyHeaders: false,
