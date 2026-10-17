@@ -15,7 +15,7 @@ export default function AppRouter() {
                 <Route element={<ProtectedRoute />}>
                     <Route element={<DashboardLayout />}>
                         <Route path="/" element={<Overview />} />
-                        <Route path="/search_leads" element={<SearchLeads />} />
+                        <Route path="/search-leads" element={<SearchLeads />} />
                         <Route path="/profile" element={<Profile />} />
                     </Route>
                 </Route>

@@ -4,9 +4,9 @@ import api from '@/lib/axios.ts'
 
 // Sample criteria until the search form is built
 const samplePayload = {
-    country: 'United States',
+    country: 'Bangladesh',
     industry: 'Technology',
-    company_size: '51-200',
+    company_size: '11-50',
     keywords: ['Software Development', 'Artificial Intelligence', 'Cloud Computing'],
 }
 

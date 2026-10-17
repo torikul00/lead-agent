@@ -3,7 +3,7 @@ import { LayoutDashboard, Radar, Search, X } from 'lucide-react'
 
 const navItems = [
     { to: '/', label: 'Overview', icon: LayoutDashboard },
-    { to: '/search_leads', label: 'Search leads', icon: Search },
+    { to: '/search-leads', label: 'Search leads', icon: Search },
 ]
 
 type SidebarProps = {
