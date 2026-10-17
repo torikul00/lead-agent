@@ -3,11 +3,12 @@ import { createServer } from 'http';
 import { parse as parseCookie } from 'cookie';
 import jwt from 'jsonwebtoken';
 import { AUTH_COOKIE_NAME } from './config/authCookie.js';
+import redis from './config/redis.js';
 
 let io = null;
 
-/** In-memory: one row per connection (multi-tab = multiple rows for same user). @type {ConnectedUser[]} */
-let connectedUsers = [];
+/** Redis hash socketId -> userId: one field per connection (multi-tab = multiple fields for same user). */
+const ONLINE_USERS_KEY = 'online_users';
 
 /**
  * @typedef {{ socketId: string, userId: number, email: string }} ConnectedUser
@@ -20,17 +21,26 @@ export function getIO() {
   return io;
 }
 
-/** Snapshot for routes / debugging; do not mutate the array from outside. */
-export function getConnectedUsers() {
-  return connectedUsers.map((c) => ({ ...c }));
+/** All open connections from Redis, for routes / debugging. */
+export async function getConnectedUsers() {
+  const users = await redis.hgetall(ONLINE_USERS_KEY);
+  return Object.entries(users ?? {}).map(([socketId, userId]) => ({ socketId, userId }));
 }
 
-function pushConnected(entry) {
-  connectedUsers = [...connectedUsers, entry];
+async function pushConnected({ socketId, userId }) {
+  try {
+    await redis.hset(ONLINE_USERS_KEY, { [socketId]: userId });
+  } catch (err) {
+    console.error(`[socket] failed to add online user: ${err.message}`);
+  }
 }
 
-function removeBySocketId(socketId) {
-  connectedUsers = connectedUsers.filter((c) => c.socketId !== socketId);
+async function removeBySocketId(socketId) {
+  try {
+    await redis.hdel(ONLINE_USERS_KEY, socketId);
+  } catch (err) {
+    console.error(`[socket] failed to remove online user: ${err.message}`);
+  }
 }
 
 function userRoom(userId) {
@@ -80,10 +90,12 @@ export function attachSocketIO(httpServer) {
   io.on('connection', (socket) => {
     const { id } = socket.data.user;
     socket.join(userRoom(id));
-    pushConnected({ socketId: socket.id, userId: id });
+    const added = pushConnected({ socketId: socket.id, userId: id });
 
-    socket.on('disconnect', (reason) => {
-      removeBySocketId(socket.id);
+    socket.on('disconnect', async (reason) => {
+      // Wait for the add so a quick disconnect can't leave a stale online user
+      await added;
+      await removeBySocketId(socket.id);
       console.log(`[socket] disconnected: ${socket.id} (${reason})`);
     });
   });

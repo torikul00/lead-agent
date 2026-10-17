@@ -1,18 +1,24 @@
 import { create } from 'zustand'
 import api from '@/lib/axios.ts'
+import socket from '@/lib/socket.ts'
 import type { AuthState } from '@/types/index.ts'
 
 const useAuthStore = create<AuthState>()((set) => ({
     user: null,
     loading: true,
 
-    setUser: (user) => set({ user }),
+    // Connect the socket once a user is logged in
+    setUser: (user) => {
+        set({ user })
+        if (user) socket.connect()
+    },
 
     // Restore the session from the auth cookie
     fetchUser: async () => {
         try {
             const { data } = await api.get('/users/me')
             set({ user: data.user })
+            socket.connect()
         } catch {
             set({ user: null })
         } finally {
@@ -22,6 +28,7 @@ const useAuthStore = create<AuthState>()((set) => ({
 
     logout: async () => {
         await api.post('/users/logout')
+        socket.disconnect()
         set({ user: null })
     },
 }))
