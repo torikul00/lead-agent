@@ -96,7 +96,6 @@ export function attachSocketIO(httpServer) {
       // Wait for the add so a quick disconnect can't leave a stale online user
       await added;
       await removeBySocketId(socket.id);
-      console.log(`[socket] disconnected: ${socket.id} (${reason})`);
     });
   });
 
