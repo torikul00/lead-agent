@@ -8,6 +8,7 @@ import cookieParser from 'cookie-parser'
 import helmet from 'helmet';
 import { apiLimiter } from './middlewares/rateLimit.middleware.js';
 import userRoutes from './src/routes/user.routes.js';
+import leadRoutes from './src/routes/lead.routes.js';
 
 connectDB();
 
@@ -61,6 +62,7 @@ app.get("/health", async (req, res) => {
 // Routes
 app.use('/api', apiLimiter);
 app.use('/api/users', userRoutes);
+app.use('/api/leads', leadRoutes);
 
 // One HTTP server: REST + Socket.IO on the same port (Render / Netlify-friendly)
 const httpServer = createHttpServer(app);

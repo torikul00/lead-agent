@@ -13,6 +13,7 @@
   "description": "",
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1129.0",
+    "@google/genai": "^2.30.0",
     "bcrypt": "^6.0.0",
     "cookie": "^1.1.1",
     "cookie-parser": "^1.4.7",
@@ -27,6 +28,7 @@
     "multer": "^2.1.1",
     "nodemailer": "^9.0.1",
     "nodemon": "^3.1.14",
+    "openai": "^7.34.0",
     "resend": "^6.33.0",
     "socket.io": "^4.8.3",
     "zod": "^4.6.7"
