@@ -10,7 +10,7 @@ export default function PageLoader() {
                 </div>
             </div>
 
-            <h1 className="mt-6 text-2xl font-bold text-slate-900">LeadAgent</h1>
+            <h1 className="mt-6 text-2xl font-bold text-slate-900">Lead Agent</h1>
             <p className="mt-1 text-sm text-slate-500">Preparing your workspace...</p>
         </div>
     )

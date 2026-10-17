@@ -23,7 +23,7 @@ export default function Sidebar({ collapsed, mobileOpen, onClose }: SidebarProps
                         <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-white">
                             <Radar className="size-5" />
                         </div>
-                        <span className={`text-lg font-semibold whitespace-nowrap text-slate-900 ${collapsed ? 'lg:hidden' : ''}`}>LeadAgent</span>
+                        <span className={`text-lg font-semibold whitespace-nowrap text-slate-900 ${collapsed ? 'lg:hidden' : ''}`}>Lead Agent</span>
                     </div>
                     <button type="button" onClick={onClose} aria-label="Close sidebar" className="cursor-pointer rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-100 lg:hidden">
                         <X className="size-5" />

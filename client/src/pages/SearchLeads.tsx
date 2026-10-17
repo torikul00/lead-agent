@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { LoaderCircle, SearchX, Sparkles, TriangleAlert } from 'lucide-react'
+import { Download, LoaderCircle, SearchX, Sparkles, TriangleAlert } from 'lucide-react'
 import api from '@/lib/axios.ts'
 import getErrorMessage from '@/lib/getErrorMessage.ts'
+import exportLeadsCsv from '@/lib/exportLeadsCsv.ts'
 import FormAlert from '@/components/FormAlert.tsx'
 import LeadSearchForm from '@/components/leads/LeadSearchForm.tsx'
 import LeadsTable from '@/components/leads/LeadsTable.tsx'
@@ -63,15 +64,24 @@ export default function SearchLeads() {
 
             {!loading && result && (
                 <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-6 py-4">
-                        <h2 className="font-semibold text-slate-900">
-                            {result.leads.length} {result.leads.length === 1 ? 'lead' : 'leads'} found
-                        </h2>
-                        {result.failed_sources.length > 0 && (
-                            <p className="flex items-center gap-1.5 text-sm text-amber-600">
-                                <TriangleAlert className="size-4" />
-                                Some sources didn't respond: {result.failed_sources.join(', ')}
-                            </p>
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-6 py-4">
+                        <div>
+                            <h2 className="font-semibold text-slate-900">
+                                {result.leads.length} {result.leads.length === 1 ? 'lead' : 'leads'} found
+                            </h2>
+                            {result.failed_sources.length > 0 && (
+                                <p className="mt-0.5 flex items-center gap-1.5 text-sm text-amber-600">
+                                    <TriangleAlert className="size-4" />
+                                    Some sources didn't respond: {result.failed_sources.join(', ')}
+                                </p>
+                            )}
+                        </div>
+
+                        {result.leads.length > 0 && (
+                            <button type="button" onClick={() => exportLeadsCsv(result.leads)} className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">
+                                <Download className="size-4" />
+                                Export CSV
+                            </button>
                         )}
                     </div>
 
