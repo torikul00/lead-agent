@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { SOURCES } from '../sources/index.js';
+import { DEFAULT_LEADS, MAX_LEADS } from '../../utils/constants.js';
 
 const COMPANY_SIZES = ['1-10', '11-50', '51-200', '201-500', '501-1000', '1001-5000', '5001-10000', '10001+'];
 const INDUSTRIES = ['Technology', 'Software', 'Financial Services', 'Healthcare', 'Marketing & Advertising', 'E-commerce & Retail', 'Telecommunications', 'Education', 'Manufacturing', 'Consulting'];
@@ -13,6 +14,12 @@ export const generateLeadsSchema = z.object({
         .array(z.string().trim().min(1, 'Keywords cannot be empty').max(50, 'Each keyword must be 50 characters or less'))
         .max(10, 'Use up to 10 keywords')
         .default([]),
+    limit: z
+        .number('Lead count must be a number')
+        .int('Lead count must be a whole number')
+        .min(1, 'Request at least 1 lead')
+        .max(MAX_LEADS, `You can request up to ${MAX_LEADS} leads`)
+        .default(DEFAULT_LEADS),
     sources: z
         .array(z.enum(SOURCE_NAMES, 'Choose a valid source'))
         .min(1, 'Choose at least one source')

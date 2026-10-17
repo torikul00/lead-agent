@@ -1,11 +1,11 @@
 import { SOURCES } from '../sources/index.js';
-import { MAX_RESULTS, SHORTLIST_SIZE } from '../../utils/constants.js';
+import { SHORTLIST_SIZE } from '../../utils/constants.js';
 import { checkMx, dedupeLeads, normalizeDomain, rankLeads } from '../../utils/helper.js';
 
 // POST /api/leads/generate_leads — find companies from the selected sources and return the top matches.
 export const generateLeads = async (req, res) => {
     try {
-        const { sources } = req.body;
+        const { sources, limit } = req.body;
 
         // Run sources in parallel; a failed source is skipped instead of failing the whole search
         const results = await Promise.allSettled(sources.map((name) => SOURCES[name].search(req.body)));
@@ -28,13 +28,13 @@ export const generateLeads = async (req, res) => {
         const leads = dedupeLeads(candidates.map((lead) => ({ ...lead, domain: normalizeDomain(lead.website), mx_status: 'not_checked' })));
 
         // Check MX only for the best candidates to keep the search fast
-        const shortlist = rankLeads(leads, req.body).slice(0, SHORTLIST_SIZE);
+        const shortlist = rankLeads(leads, req.body).slice(0, Math.max(limit, SHORTLIST_SIZE));
         await Promise.all(shortlist.map(async (lead) => {
             lead.mx_status = await checkMx(lead.domain);
         }));
 
         return res.status(200).json({
-            leads: rankLeads(shortlist, req.body).slice(0, MAX_RESULTS),
+            leads: rankLeads(shortlist, req.body).slice(0, limit),
             failed_sources: failedSources,
         });
     } catch (err) {
