@@ -47,7 +47,7 @@ export default function SearchLeads() {
             {loading && (
                 <div className="flex flex-col items-center rounded-2xl border border-slate-200 bg-white px-6 py-16 text-center">
                     <LoaderCircle className="size-8 animate-spin text-primary" />
-                    <p className="mt-4 font-medium text-slate-900">Finding companies...</p>
+                    <p className="mt-4 font-medium text-slate-900">Finding leads...</p>
                     <p className="mt-1 text-sm text-slate-500">Searching sources and checking each domain. This can take a few seconds.</p>
                 </div>
             )}
