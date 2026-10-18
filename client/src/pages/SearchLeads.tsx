@@ -77,7 +77,7 @@ export default function SearchLeads() {
                             {result.failed_sources.length > 0 && (
                                 <p className="mt-0.5 flex items-center gap-1.5 text-sm text-amber-600">
                                     <TriangleAlert className="size-4" />
-                                    Some sources didn't respond: {result.failed_sources.join(', ')}
+                                    Some sources didn't respond, so results may be incomplete.
                                 </p>
                             )}
                         </div>
@@ -91,7 +91,23 @@ export default function SearchLeads() {
                     </div>
 
                     {result.leads.length > 0 ? (
-                        <LeadsTable leads={result.leads} onLeadUpdate={updateLead} />
+                        <>
+                            <LeadsTable leads={result.leads} onLeadUpdate={updateLead} />
+
+                            {/* OpenStreetMap's license (ODbL) and Geoapify's free plan require these credits wherever their data is shown */}
+                            {result.leads.some((lead) => ['OpenStreetMap', 'Geoapify'].includes(lead.source_name)) && (
+                                <p className="border-t border-slate-200 px-6 py-3 text-xs text-slate-500">
+                                    Some company data ©{' '}
+                                    <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" className="underline transition hover:text-primary">OpenStreetMap contributors</a>
+                                    {result.leads.some((lead) => lead.source_name === 'Geoapify') && (
+                                        <>
+                                            {' · Powered by '}
+                                            <a href="https://www.geoapify.com/" target="_blank" rel="noopener noreferrer" className="underline transition hover:text-primary">Geoapify</a>
+                                        </>
+                                    )}
+                                </p>
+                            )}
+                        </>
                     ) : (
                         <div className="flex flex-col items-center px-6 py-16 text-center">
                             <SearchX className="size-8 text-slate-400" />

@@ -12,6 +12,27 @@ export const normalizeDomain = (website) => {
     }
 };
 
+// Social profiles aren't company websites
+const SOCIAL_SITES = ['facebook.com', 'instagram.com', 'linkedin.com', 'twitter.com', 'x.com', 'youtube.com', 'tiktok.com'];
+
+// Map data can hold several values in one field: "+46 8 123; +46 8 456" -> "+46 8 123"
+export const firstValue = (value) => (typeof value === 'string' ? value.split(';')[0].trim() || null : null);
+
+// "www.acme.se" -> "https://www.acme.se/"; null for social profiles or anything that isn't a web address
+export const toWebsite = (value) => {
+    const website = firstValue(value);
+    if (!website) return null;
+    try {
+        const url = new URL(/^https?:\/\//i.test(website) ? website : `https://${website}`);
+        const isSocial = SOCIAL_SITES.some((site) => url.hostname === site || url.hostname.endsWith(`.${site}`));
+        return isSocial ? null : url.href;
+    } catch {
+        return null;
+    }
+};
+
+export const isValidEmail = (email) => /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/.test(email);
+
 const normalizeName = (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
 // "José García" -> "jose garcia", so the same person from two sources matches

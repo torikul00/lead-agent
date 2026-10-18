@@ -21,7 +21,7 @@ const EXCLUDED_TYPES = ['Q7397', 'Q35127', 'Q431289', 'Q189210', 'Q19967801', 'Q
 
 export const toItems = (ids) => ids.map((id) => `wd:${id}`).join(' ');
 
-// The label service falls back to the bare Q-id when an item has no English name
+// The label service falls back to the bare Q-id when an item has no English or all-languages ("mul") name
 export const readLabel = (binding) => (binding && !/^Q\d+$/.test(binding.value) ? binding.value : null);
 
 export const runQuery = async (query) => {
@@ -67,13 +67,14 @@ const buildSizeFilter = (companySize) => {
     return `FILTER(!BOUND(?employees) || (?employees >= ${min}${upper}))`;
 };
 
+// Companies registered in the country (P17) or headquartered there (P159); "mul" covers names stored once for every language
 const buildSearchQuery = (countryId, industryItems, companySize) => `
     SELECT ?company ?companyLabel ?description ?website ?employees ?industryLabel ?hqLabel WHERE {
         VALUES ?industry { ${toItems(industryItems)} }
         ?company wdt:P452 ?industry;
-                 wdt:P17 wd:${countryId};
                  wdt:P856 ?website;
                  wikibase:sitelinks ?sitelinks.
+        { ?company wdt:P17 wd:${countryId}. } UNION { ?company wdt:P159/wdt:P17 wd:${countryId}. }
         FILTER NOT EXISTS {
             VALUES ?excluded { ${toItems(EXCLUDED_TYPES)} }
             ?company wdt:P31 ?excluded.
@@ -83,7 +84,7 @@ const buildSearchQuery = (countryId, industryItems, companySize) => `
         ${buildSizeFilter(companySize)}
         OPTIONAL { ?company wdt:P159 ?hq. }
         OPTIONAL { ?company schema:description ?description. FILTER(LANG(?description) = "en") }
-        SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
+        SERVICE wikibase:label { bd:serviceParam wikibase:language "en,mul". }
     }
     ORDER BY DESC(?sitelinks)
     LIMIT ${ROW_LIMIT}

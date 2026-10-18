@@ -8,7 +8,6 @@ import { checkMx, countEmails, dedupeLeads, normalizeDomain, rankLeads } from '.
 export const generateLeads = async (req, res) => {
     try {
         const { sources, limit } = req.body;
-        console.log(sources)
 
         // Run sources in parallel; a failed source is skipped instead of failing the whole search
         const results = await Promise.allSettled(sources.map((name) => SOURCES[name].search(req.body)));
@@ -28,12 +27,13 @@ export const generateLeads = async (req, res) => {
             return res.status(502).json({ error: 'Could not reach the lead sources right now. Please try again.' });
         }
 
+        // Some sources already know the company's phone or an email (OpenStreetMap), so those are kept
         const leads = dedupeLeads(candidates.map((lead) => ({
+            phone: null,
+            company_emails: [],
             ...lead,
             domain: normalizeDomain(lead.website),
             mx_status: 'not_checked',
-            phone: null,
-            company_emails: [],
             contacts: [],
         })));
 

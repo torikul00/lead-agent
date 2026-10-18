@@ -188,7 +188,7 @@ export default function LeadsTable({ leads, onLeadUpdate }: LeadsTableProps) {
                                         </div>
                                     </td>
                                     <td className="px-4 py-4">
-                                        <p className="max-w-[200px] truncate text-slate-600 capitalize" title={lead.industry ?? undefined}>{lead.industry ?? '—'}</p>
+                                        <p className="max-w-50 truncate text-slate-600 capitalize" title={lead.industry ?? undefined}>{lead.industry ?? '—'}</p>
                                     </td>
                                     <td className="px-4 py-4 text-slate-600">{lead.employee_count?.toLocaleString() ?? '—'}</td>
                                     <td className="px-4 py-4">
