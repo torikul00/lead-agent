@@ -11,6 +11,22 @@ export type MxStatus = 'found' | 'not_found' | 'error' | 'not_checked'
 
 export type FitLabel = 'good_fit' | 'needs_review' | 'poor_fit'
 
+export type Contact = {
+    name: string
+    title: string
+    role: string
+    email: string | null
+    linkedin_url: string | null
+    source_name: string
+    source_url: string
+}
+
+export type CompanyEmail = {
+    email: string
+    source_name: string
+    source_url: string
+}
+
 export type Lead = {
     name: string
     website: string
@@ -23,6 +39,9 @@ export type Lead = {
     source_name: string
     source_url: string | null
     mx_status: MxStatus
+    phone: string | null
+    company_emails: CompanyEmail[]
+    contacts: Contact[]
     score: number
     fit_label: FitLabel
     score_reasons: string[]

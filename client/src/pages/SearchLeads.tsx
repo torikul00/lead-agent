@@ -22,7 +22,7 @@ export default function SearchLeads() {
     const handleSearch = async (criteria: LeadSearchInput) => {
         setLoading(true)
         setError('')
-
+        console.log(criteria);
         try {
             const { data } = await api.post('/leads/generate_leads', criteria)
             setResult(data)
@@ -48,7 +48,7 @@ export default function SearchLeads() {
                 <div className="flex flex-col items-center rounded-2xl border border-slate-200 bg-white px-6 py-16 text-center">
                     <LoaderCircle className="size-8 animate-spin text-primary" />
                     <p className="mt-4 font-medium text-slate-900">Finding leads...</p>
-                    <p className="mt-1 text-sm text-slate-500">Searching sources and checking each domain. This can take a few seconds.</p>
+                    <p className="mt-1 text-sm text-slate-500">Searching sources, checking each domain and reading company websites for decision makers. This can take up to a minute.</p>
                 </div>
             )}
 

@@ -1,4 +1,5 @@
 import { Resolver } from 'dns/promises';
+import { MAX_COMPANY_EMAILS, MAX_CONTACTS } from './constants.js';
 
 const resolver = new Resolver({ timeout: 3000, tries: 1 });
 
@@ -12,6 +13,9 @@ export const normalizeDomain = (website) => {
 };
 
 const normalizeName = (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+// "José García" -> "jose garcia", so the same person from two sources matches
+export const normalizePersonName = (name) => normalizeName(name.normalize('NFD').replace(/\p{M}/gu, ''));
 
 // One lead per company: by domain, or by name + country when there's no domain
 export const dedupeLeads = (leads) => {
@@ -34,6 +38,63 @@ export const checkMx = async (domain) => {
     }
 };
 
+// Run fn for every item, at most `limit` at a time
+export const runWithConcurrency = async (items, limit, fn) => {
+    let next = 0;
+    const worker = async () => {
+        while (next < items.length) await fn(items[next++]);
+    };
+    await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+};
+
+// Decision-maker roles, highest priority first, matched against job titles
+const ROLES = [
+    ['CEO', /\b(ceo|chief executive)\b/i],
+    ['Founder', /founder|\bfounding partner\b/i],
+    ['Owner', /(?<!product )\bowner\b/i],
+    ['President', /(?<!vice[ -])\bpresident\b/i],
+    ['Managing Director', /\bmanaging director\b|gesch(ä|ae)ftsf(ü|ue)hrer/i],
+    ['CTO', /\b(cto|chief technology|chief technical)\b/i],
+    ['CFO', /\b(cfo|chief financial)\b/i],
+    ['COO', /\b(coo|chief operating)\b/i],
+    ['CMO', /\b(cmo|chief marketing)\b/i],
+    ['Partner', /\bpartner$/i],
+    ['Chair', /(?<!vice[ -])\bchair(man|woman|person)?\b/i],
+];
+const ROLE_ORDER = ROLES.map(([role]) => role);
+
+// Titles that mention a role without holding it, e.g. "Assistant to the CEO" or "Former CFO"
+const NOT_HOLDING_ROLE = /\b(assistant|intern|former|ex|retired|emeritus|advisor|adviser)\b/i;
+
+// "Co-Founder & Chief Executive Officer" -> "CEO"; null when the title isn't a decision maker
+export const getRole = (title) => {
+    if (NOT_HOLDING_ROLE.test(title)) return null;
+    return ROLES.find(([, pattern]) => pattern.test(title))?.[0] ?? null;
+};
+
+// Add a person once per lead, most senior first; a second source only fills in what's missing
+export const addContact = (lead, contact) => {
+    const key = normalizePersonName(contact.name);
+    const existing = lead.contacts.find((item) => normalizePersonName(item.name) === key);
+    if (existing) {
+        existing.email ??= contact.email;
+        existing.linkedin_url ??= contact.linkedin_url;
+        return;
+    }
+
+    if (lead.contacts.length >= MAX_CONTACTS) return;
+    lead.contacts.push(contact);
+    lead.contacts.sort((a, b) => ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role));
+};
+
+// Add a company email once, unless it already belongs to one of the lead's people
+export const addCompanyEmail = (lead, entry) => {
+    if (lead.company_emails.length >= MAX_COMPANY_EMAILS) return;
+    if (lead.company_emails.some((item) => item.email === entry.email)) return;
+    if (lead.contacts.some((contact) => contact.email === entry.email)) return;
+    lead.company_emails.push(entry);
+};
+
 const toWords = (text) => new Set(text.toLowerCase().match(/[a-z0-9]+/g));
 
 // A keyword matches when at least half of its words appear, e.g. "Software Development" matches "software industry"
@@ -51,11 +112,11 @@ const getFitLabel = (score) => {
 
 // Rule-based score (0-100) with a readable reason for each rule
 const scoreLead = (lead, { company_size, keywords }) => {
-    let score = 30;
+    let score = 20;
     const reasons = [`Matches ${lead.country} and the selected industry`];
 
     if (!company_size) {
-        score += 30;
+        score += 25;
     } else if (lead.employee_count === null) {
         score += 10;
         reasons.push('Employee count unknown');
@@ -63,7 +124,7 @@ const scoreLead = (lead, { company_size, keywords }) => {
         // "51-200" -> [51, 200], "10001+" -> [10001, 0] (no upper limit)
         const [min, max] = company_size.split(/[-+]/).map(Number);
         if (lead.employee_count >= min && (!max || lead.employee_count <= max)) {
-            score += 30;
+            score += 25;
             reasons.push(`${lead.employee_count} employees fits ${company_size}`);
         } else {
             reasons.push(`${lead.employee_count} employees is outside ${company_size}`);
@@ -71,17 +132,29 @@ const scoreLead = (lead, { company_size, keywords }) => {
     }
 
     if (!keywords.length) {
-        score += 30;
+        score += 25;
     } else {
         const words = toWords(`${lead.name} ${lead.industry ?? ''} ${lead.description ?? ''}`);
         const matched = keywords.filter((keyword) => matchesKeyword(words, keyword));
-        score += Math.round((matched.length / keywords.length) * 30);
+        score += Math.round((matched.length / keywords.length) * 25);
         reasons.push(matched.length ? `Matches keywords: ${matched.join(', ')}` : 'No keywords matched');
     }
 
     if (lead.mx_status === 'found') {
         score += 10;
         reasons.push('Mail server (MX) found');
+    }
+
+    if (lead.contacts.length) {
+        const [first] = lead.contacts;
+        const others = lead.contacts.length - 1;
+        score += 10;
+        reasons.push(`Decision maker found: ${first.name} (${first.role})${others ? ` and ${others} more` : ''}`);
+    }
+
+    if (lead.company_emails.length || lead.contacts.some((contact) => contact.email)) {
+        score += 10;
+        reasons.push('Email address found');
     }
 
     return { score, fit_label: getFitLabel(score), score_reasons: reasons };

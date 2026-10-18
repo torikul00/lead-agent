@@ -1,6 +1,6 @@
 import { Fragment, useState } from 'react'
-import { Check, ChevronDown, ExternalLink } from 'lucide-react'
-import type { FitLabel, Lead, MxStatus } from '@/types/index.ts'
+import { Check, ChevronDown, Copy, ExternalLink, Mail, Phone } from 'lucide-react'
+import type { Contact, FitLabel, Lead, MxStatus } from '@/types/index.ts'
 
 const FIT_LABELS: Record<FitLabel, { label: string; className: string }> = {
     good_fit: { label: 'Good fit', className: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20' },
@@ -21,18 +21,78 @@ const SCORE_BARS: Record<FitLabel, string> = {
     poor_fit: 'bg-slate-400',
 }
 
+function CopyButton({ text }: { text: string }) {
+    const [copied, setCopied] = useState(false)
+
+    const copy = () => {
+        navigator.clipboard.writeText(text).then(() => {
+            setCopied(true)
+            setTimeout(() => setCopied(false), 1500)
+        })
+    }
+
+    return (
+        <button type="button" onClick={copy} aria-label={`Copy ${text}`} className="cursor-pointer rounded p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600">
+            {copied ? <Check className="size-3.5 text-primary" /> : <Copy className="size-3.5" />}
+        </button>
+    )
+}
+
+function EmailLink({ email }: { email: string }) {
+    return (
+        <span className="inline-flex min-w-0 items-center gap-0.5">
+            <a href={`mailto:${email}`} className="truncate text-sm text-primary hover:underline">{email}</a>
+            <CopyButton text={email} />
+        </span>
+    )
+}
+
+// Icon link to where an item was found; the source name shows on hover
+function SourceLink({ name, url }: { name: string; url: string }) {
+    return (
+        <a href={url} target="_blank" rel="noopener noreferrer" title={`Found on ${name}`} aria-label={`Found on ${name}`} className="shrink-0 text-slate-300 transition hover:text-primary">
+            <ExternalLink className="size-3.5" />
+        </a>
+    )
+}
+
+function ContactItem({ contact }: { contact: Contact }) {
+    return (
+        <li className="min-w-0 rounded-lg border border-slate-200 px-3 py-2">
+            <div className="flex items-center justify-between gap-2">
+                <p className="flex min-w-0 items-center gap-1.5">
+                    <span className="truncate font-medium text-slate-900">{contact.name}</span>
+                    <span className="shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-xs leading-none font-medium text-primary">{contact.role}</span>
+                </p>
+                <SourceLink name={contact.source_name} url={contact.source_url} />
+            </div>
+            {contact.title !== contact.role && <p className="truncate text-xs text-slate-500" title={contact.title}>{contact.title}</p>}
+
+            {(contact.email || contact.linkedin_url) && (
+                <div className="mt-1 flex min-w-0 items-center gap-3">
+                    {contact.email && <EmailLink email={contact.email} />}
+                    {contact.linkedin_url && (
+                        <a href={contact.linkedin_url} target="_blank" rel="noopener noreferrer" className="shrink-0 text-xs font-medium text-slate-500 transition hover:text-primary">LinkedIn</a>
+                    )}
+                </div>
+            )}
+        </li>
+    )
+}
+
 export default function LeadsTable({ leads }: { leads: Lead[] }) {
     const [openRow, setOpenRow] = useState<string | null>(null)
 
     return (
         <div className="overflow-x-auto">
-            <table className="w-full min-w-[880px] text-left text-sm">
+            <table className="w-full min-w-260 text-left text-sm">
                 <thead className="border-b border-slate-200 bg-slate-50/80 text-xs font-medium tracking-wide text-slate-500 uppercase">
                     <tr>
                         <th className="px-6 py-3">Company</th>
                         <th className="px-4 py-3">Industry</th>
                         <th className="px-4 py-3">Employees</th>
                         <th className="px-4 py-3">Location</th>
+                        <th className="px-4 py-3">Contacts</th>
                         <th className="px-4 py-3">Mail server</th>
                         <th className="px-4 py-3">Score</th>
                         <th className="w-12 px-4 py-3"><span className="sr-only">Details</span></th>
@@ -44,6 +104,8 @@ export default function LeadsTable({ leads }: { leads: Lead[] }) {
                         const open = openRow === key
                         const fit = FIT_LABELS[lead.fit_label]
                         const mx = MX_LABELS[lead.mx_status]
+                        const [firstContact] = lead.contacts
+                        const emailCount = lead.company_emails.length + lead.contacts.filter((contact) => contact.email).length
 
                         return (
                             <Fragment key={key}>
@@ -73,6 +135,24 @@ export default function LeadsTable({ leads }: { leads: Lead[] }) {
                                         <p className="text-xs text-slate-500">{lead.country}</p>
                                     </td>
                                     <td className="px-4 py-4">
+                                        {firstContact && (
+                                            <>
+                                                <p className="max-w-45 truncate font-medium text-slate-900">{firstContact.name}</p>
+                                                <p className="text-xs text-slate-500">
+                                                    {firstContact.role}
+                                                    {lead.contacts.length > 1 && ` · +${lead.contacts.length - 1} more`}
+                                                </p>
+                                            </>
+                                        )}
+                                        {emailCount > 0 && (
+                                            <p className={`flex items-center gap-1 text-xs text-slate-500 ${firstContact ? 'mt-1' : ''}`}>
+                                                <Mail className="size-3.5" />
+                                                {emailCount} {emailCount === 1 ? 'email' : 'emails'}
+                                            </p>
+                                        )}
+                                        {!firstContact && !emailCount && <span className="text-slate-600">—</span>}
+                                    </td>
+                                    <td className="px-4 py-4">
                                         <span className="inline-flex items-center gap-2 text-slate-600">
                                             <span className={`size-2 rounded-full ${mx.dot}`} />
                                             {mx.label}
@@ -96,28 +176,44 @@ export default function LeadsTable({ leads }: { leads: Lead[] }) {
 
                                 {open && (
                                     <tr className="bg-slate-50/80">
-                                        <td colSpan={7} className="px-6 pt-1 pb-6">
-                                            <div className="grid gap-6 rounded-xl border border-slate-200 bg-white p-5 md:grid-cols-2">
+                                        <td colSpan={8} className="px-6 pb-4">
+                                            <div className="grid grid-cols-[1fr_2fr_1fr] gap-6 rounded-xl border border-slate-200 bg-white p-4">
                                                 <div>
                                                     <h3 className="text-xs font-medium tracking-wide text-slate-500 uppercase">About</h3>
-                                                    <p className="mt-2 text-sm text-slate-700">{lead.description ?? 'No description available.'}</p>
-                                                    {lead.source_url && (
-                                                        <a href={lead.source_url} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
-                                                            View on {lead.source_name}
-                                                            <ExternalLink className="size-3.5" />
-                                                        </a>
+                                                    <p className="mt-1.5 text-sm text-slate-700">{lead.description ?? 'No description available.'}</p>
+                                                </div>
+
+                                                <div className="min-w-0">
+                                                    <h3 className="text-xs font-medium tracking-wide text-slate-500 uppercase">Decision makers</h3>
+                                                    {lead.contacts.length > 0 ? (
+                                                        <ul className="mt-1.5 grid grid-cols-2 gap-2">
+                                                            {lead.contacts.map((contact) => <ContactItem key={contact.name} contact={contact} />)}
+                                                        </ul>
+                                                    ) : (
+                                                        <p className="mt-1.5 text-sm text-slate-500">No decision makers found.</p>
                                                     )}
                                                 </div>
-                                                <div>
-                                                    <h3 className="text-xs font-medium tracking-wide text-slate-500 uppercase">Why this score</h3>
-                                                    <ul className="mt-2 space-y-1.5">
-                                                        {lead.score_reasons.map((reason) => (
-                                                            <li key={reason} className="flex items-start gap-2 text-sm text-slate-700">
-                                                                <Check className="mt-0.5 size-4 shrink-0 text-primary" />
-                                                                {reason}
-                                                            </li>
-                                                        ))}
-                                                    </ul>
+
+                                                <div className="min-w-0">
+                                                    <h3 className="text-xs font-medium tracking-wide text-slate-500 uppercase">Company contact</h3>
+                                                    {lead.company_emails.length > 0 ? (
+                                                        <ul className="mt-1.5 space-y-1">
+                                                            {lead.company_emails.map((item) => (
+                                                                <li key={item.email} className="flex items-center justify-between gap-2">
+                                                                    <EmailLink email={item.email} />
+                                                                    <SourceLink name={item.source_name} url={item.source_url} />
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    ) : (
+                                                        <p className="mt-1.5 text-sm text-slate-500">No company email found.</p>
+                                                    )}
+                                                    {lead.phone && (
+                                                        <a href={`tel:${lead.phone}`} className="mt-2 inline-flex items-center gap-1.5 text-sm text-slate-700 transition hover:text-primary">
+                                                            <Phone className="size-3.5 text-slate-400" />
+                                                            {lead.phone}
+                                                        </a>
+                                                    )}
                                                 </div>
                                             </div>
                                         </td>

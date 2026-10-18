@@ -8,7 +8,7 @@ const toCell = (value: string | number | null) => {
 }
 
 export default function exportLeadsCsv(leads: Lead[]) {
-    const header = ['Company', 'Website', 'Domain', 'Industry', 'Employees', 'Location', 'Country', 'Description', 'Mail server', 'Score', 'Fit', 'Score reasons', 'Source', 'Source URL']
+    const header = ['Company', 'Website', 'Domain', 'Industry', 'Employees', 'Location', 'Country', 'Contacts', 'Emails', 'Phone', 'Description', 'Mail server', 'Score', 'Fit', 'Score reasons', 'Source', 'Source URL']
     const rows = leads.map((lead) => [
         lead.name,
         lead.website,
@@ -17,6 +17,10 @@ export default function exportLeadsCsv(leads: Lead[]) {
         lead.employee_count,
         lead.address,
         lead.country,
+        // "Jane Smith (CEO) <jane@acme.com>; John Doe (Founder)"
+        lead.contacts.map((contact) => `${contact.name} (${contact.title})${contact.email ? ` <${contact.email}>` : ''}`).join('; '),
+        [...lead.contacts.flatMap((contact) => contact.email ?? []), ...lead.company_emails.map((item) => item.email)].join('; '),
+        lead.phone,
         lead.description,
         lead.mx_status,
         lead.score,

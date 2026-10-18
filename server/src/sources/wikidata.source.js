@@ -19,12 +19,12 @@ const INDUSTRY_ITEMS = {
 // Item types that are products or non-companies (software, website, brand, web app, online service, app, nonprofit, review site, SaaS, organization)
 const EXCLUDED_TYPES = ['Q7397', 'Q35127', 'Q431289', 'Q189210', 'Q19967801', 'Q166142', 'Q163740', 'Q1340449', 'Q1254596', 'Q43229'];
 
-const toItems = (ids) => ids.map((id) => `wd:${id}`).join(' ');
+export const toItems = (ids) => ids.map((id) => `wd:${id}`).join(' ');
 
 // The label service falls back to the bare Q-id when an item has no English name
-const readLabel = (binding) => (binding && !/^Q\d+$/.test(binding.value) ? binding.value : null);
+export const readLabel = (binding) => (binding && !/^Q\d+$/.test(binding.value) ? binding.value : null);
 
-const runQuery = async (query) => {
+export const runQuery = async (query) => {
     const response = await fetch(`${SPARQL_URL}?format=json&query=${encodeURIComponent(query)}`, {
         headers: {
             'Accept': 'application/sparql-results+json',
