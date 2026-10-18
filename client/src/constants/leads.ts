@@ -1,6 +1,10 @@
 // Country names must match Wikidata's English names exactly
 export const COUNTRIES = [
-    'Sweden'
+    'Australia', 'Austria', 'Bangladesh', 'Belgium', 'Brazil', 'Canada', 'Denmark', 'Egypt', 'Estonia', 'Finland',
+    'France', 'Germany', 'India', 'Indonesia', 'Ireland', 'Israel', 'Italy', 'Japan', 'Kenya', 'Malaysia',
+    'Mexico', 'Netherlands', 'New Zealand', 'Nigeria', 'Norway', 'Pakistan', "People's Republic of China", 'Philippines', 'Poland', 'Portugal',
+    'Saudi Arabia', 'Singapore', 'South Africa', 'South Korea','Sweden', 'Spain', 'Switzerland', 'Turkey', 'United Arab Emirates', 'United Kingdom',
+    'United States', 'Vietnam',
 ] as const
 
 // Must match the server's industry list
