@@ -1,10 +1,13 @@
-import { COUNTRY_CODES } from '../../utils/constants.js';
+import { CITY_RADIUS_KM, COUNTRY_CODES } from '../../utils/constants.js';
 import { firstValue, isValidEmail, toWebsite } from '../../utils/helper.js';
 
 const PLACES_URL = 'https://api.geoapify.com/v2/places';
+const AUTOCOMPLETE_URL = 'https://api.geoapify.com/v1/geocode/autocomplete';
 const REQUEST_TIMEOUT_MS = 20000;
 const HUB_RADIUS_M = 100000;
 const ROW_LIMIT = 500;
+const CITY_SUGGESTIONS = 6;
+const CITY_CACHE_SIZE = 1000;
 
 // Geoapify can't search a whole country (very large areas come back nearly empty), so each country is searched
 // in 100 km circles around up to five business cities, spread out to cover different regions: [longitude, latitude]
@@ -76,35 +79,40 @@ const GEOAPIFY_ERRORS = {
     429: 'Geoapify daily credits or rate limit reached',
 };
 
-// Named places of the categories within 100 km of one hub; each request costs one credit on the free plan
-const searchHub = async (categories, [lon, lat]) => {
+// Suggestions already fetched, so typing the same letters again doesn't cost another credit
+const cityCache = new Map();
+
+// Geoapify's own message goes into the server log
+const toGeoapifyError = async (response) => {
+    const { message } = await response.json().catch(() => ({}));
+    return new Error(GEOAPIFY_ERRORS[response.status] ?? `Geoapify request failed with status ${response.status}: ${message}`);
+};
+
+// Named places of the categories within a circle; each request costs one credit on the free plan
+const searchCircle = async (categories, [lon, lat], radiusM) => {
     const params = new URLSearchParams({
         categories: categories.join(','),
-        filter: `circle:${lon},${lat},${HUB_RADIUS_M}`,
+        filter: `circle:${lon},${lat},${radiusM}`,
         conditions: 'named',
         limit: ROW_LIMIT,
         apiKey: process.env.GEOAPIFY_API_KEY,
     });
     const response = await fetch(`${PLACES_URL}?${params}`, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
-
-    if (!response.ok) {
-        const { message } = await response.json().catch(() => ({}));
-        throw new Error(GEOAPIFY_ERRORS[response.status] ?? `Geoapify request failed with status ${response.status}: ${message}`);
-    }
+    if (!response.ok) throw await toGeoapifyError(response);
 
     const data = await response.json();
     return data.features ?? [];
 };
 
-// Hubs are searched one after another to stay under the free plan's 5 requests per second; one failed hub doesn't drop the others
-const searchCountry = async (hubs, categories) => {
+// Circles are searched one after another to stay under the free plan's 5 requests per second; one failed circle doesn't drop the others
+const searchCircles = async (centres, categories, radiusM) => {
     if (!process.env.GEOAPIFY_API_KEY) throw new Error('GEOAPIFY_API_KEY is not set');
 
     const features = [];
     let lastError = null;
-    for (const hub of hubs) {
+    for (const centre of centres) {
         try {
-            features.push(...await searchHub(categories, hub));
+            features.push(...await searchCircle(categories, centre, radiusM));
         } catch (err) {
             lastError = err;
         }
@@ -112,6 +120,40 @@ const searchCountry = async (hubs, categories) => {
 
     if (!features.length && lastError) throw lastError;
     return features;
+};
+
+// City suggestions inside the country while the user types, e.g. "Göteb" -> Gothenburg, Västra Götaland County
+export const searchCities = async (country, text) => {
+    const countryCode = COUNTRY_CODES[country];
+    if (!countryCode) return [];
+    if (!process.env.GEOAPIFY_API_KEY) throw new Error('GEOAPIFY_API_KEY is not set');
+
+    const cacheKey = `${countryCode}|${text.toLowerCase()}`;
+    if (cityCache.has(cacheKey)) return cityCache.get(cacheKey);
+
+    const params = new URLSearchParams({
+        text,
+        type: 'city',
+        filter: `countrycode:${countryCode.toLowerCase()}`,
+        lang: 'en',
+        limit: CITY_SUGGESTIONS,
+        format: 'json',
+        apiKey: process.env.GEOAPIFY_API_KEY,
+    });
+    const response = await fetch(`${AUTOCOMPLETE_URL}?${params}`, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+    if (!response.ok) throw await toGeoapifyError(response);
+
+    // The same place can come back twice, so keep one per name and region
+    const { results = [] } = await response.json();
+    const cities = [];
+    for (const place of results) {
+        const city = { name: place.city ?? place.name, region: place.county ?? place.state ?? null, lat: place.lat, lon: place.lon };
+        if (city.name && !cities.some((item) => item.name === city.name && item.region === city.region)) cities.push(city);
+    }
+
+    if (cityCache.size >= CITY_CACHE_SIZE) cityCache.clear();
+    cityCache.set(cacheKey, cities);
+    return cities;
 };
 
 // The website, phone and email come from the place itself or its OpenStreetMap tags ("datasource.raw")
@@ -147,12 +189,15 @@ export default {
     type: 'api',
 
     // Smaller, local companies from OpenStreetMap data; there are no employee counts, so the size filter can't apply here
-    async search({ country, industry }) {
-        const hubs = COUNTRY_HUBS[country];
+    async search({ country, industry, city }) {
         const categories = INDUSTRY_CATEGORIES[industry];
-        if (!hubs || !categories || !COUNTRY_CODES[country]) return [];
+        if (!categories || !COUNTRY_CODES[country]) return [];
 
-        const features = await searchCountry(hubs, categories);
+        // A selected city is one circle (one credit); otherwise the country's business cities
+        const features = city
+            ? await searchCircles([[city.lon, city.lat]], categories, CITY_RADIUS_KM * 1000)
+            : await searchCircles(COUNTRY_HUBS[country] ?? [], categories, HUB_RADIUS_M);
+
         return toCandidates(features, country, industry);
     },
 };

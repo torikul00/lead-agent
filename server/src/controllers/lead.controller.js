@@ -1,6 +1,7 @@
 import { SOURCES } from '../sources/index.js';
 import { ENRICHERS } from '../enrichers/index.js';
 import hunter from '../enrichers/hunter.enricher.js';
+import { searchCities } from '../sources/geoapify.source.js';
 import { SHORTLIST_SIZE } from '../../utils/constants.js';
 import { checkMx, countEmails, dedupeLeads, normalizeDomain, rankLeads } from '../../utils/helper.js';
 
@@ -61,6 +62,18 @@ export const generateLeads = async (req, res) => {
     } catch (err) {
         console.error('Lead generation failed:', err);
         return res.status(500).json({ error: 'Could not generate leads right now. Please try again.' });
+    }
+};
+
+// POST /api/leads/find_cities — city suggestions for the search form while the user types
+export const findCities = async (req, res) => {
+    try {
+        const cities = await searchCities(req.body.country, req.body.text);
+        return res.status(200).json({ cities });
+    } catch (err) {
+        // The reason (bad key, no credits left...) stays in the server log; users get a general message
+        console.error('City search failed:', err);
+        return res.status(502).json({ error: 'Could not load cities right now. Please try again.' });
     }
 };
 

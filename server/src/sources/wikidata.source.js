@@ -1,3 +1,5 @@
+import { CITY_RADIUS_KM } from '../../utils/constants.js';
+
 const SPARQL_URL = 'https://query.wikidata.org/sparql';
 const QUERY_TIMEOUT_MS = 30000;
 const ROW_LIMIT = 500;
@@ -67,14 +69,24 @@ const buildSizeFilter = (companySize) => {
     return `FILTER(!BOUND(?employees) || (?employees >= ${min}${upper}))`;
 };
 
+// With a city, keep companies headquartered within CITY_RADIUS_KM of its centre (geof:distance is in km)
+const buildCityFilter = (city) => {
+    if (!city) return '';
+    return `
+        ?company wdt:P159/wdt:P625 ?hqLocation.
+        FILTER(geof:distance(?hqLocation, "Point(${city.lon} ${city.lat})"^^geo:wktLiteral) <= ${CITY_RADIUS_KM})
+    `;
+};
+
 // Companies registered in the country (P17) or headquartered there (P159); "mul" covers names stored once for every language
-const buildSearchQuery = (countryId, industryItems, companySize) => `
+const buildSearchQuery = (countryId, industryItems, companySize, city) => `
     SELECT ?company ?companyLabel ?description ?website ?employees ?industryLabel ?hqLabel WHERE {
         VALUES ?industry { ${toItems(industryItems)} }
         ?company wdt:P452 ?industry;
                  wdt:P856 ?website;
                  wikibase:sitelinks ?sitelinks.
         { ?company wdt:P17 wd:${countryId}. } UNION { ?company wdt:P159/wdt:P17 wd:${countryId}. }
+        ${buildCityFilter(city)}
         FILTER NOT EXISTS {
             VALUES ?excluded { ${toItems(EXCLUDED_TYPES)} }
             ?company wdt:P31 ?excluded.
@@ -134,14 +146,14 @@ export default {
     label: 'Wikidata',
     type: 'api',
 
-    async search({ country, industry, company_size }) {
+    async search({ country, industry, company_size, city }) {
         const industryItems = INDUSTRY_ITEMS[industry];
         if (!industryItems) return [];
 
         const countryId = await findCountryId(country);
         if (!countryId) return [];
 
-        const rows = await runQuery(buildSearchQuery(countryId, industryItems, company_size));
+        const rows = await runQuery(buildSearchQuery(countryId, industryItems, company_size, city));
         return toCandidates(rows, country);
     },
 };

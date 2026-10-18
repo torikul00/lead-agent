@@ -3,6 +3,9 @@ export const DEFAULT_LEADS = 10;
 export const MAX_LEADS = 50;
 export const SHORTLIST_SIZE = 20;
 
+// A selected city covers its metro area: companies within this distance of the city centre
+export const CITY_RADIUS_KM = 30;
+
 // ISO 3166-1 codes for the countries the search form offers, used by the map-based sources
 export const COUNTRY_CODES = {
     'Australia': 'AU', 'Austria': 'AT', 'Bangladesh': 'BD', 'Belgium': 'BE', 'Brazil': 'BR', 'Canada': 'CA', 'Denmark': 'DK',

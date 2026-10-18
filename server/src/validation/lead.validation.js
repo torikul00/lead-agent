@@ -6,8 +6,16 @@ const COMPANY_SIZES = ['1-10', '11-50', '51-200', '201-500', '501-1000', '1001-5
 const INDUSTRIES = ['Technology', 'Software', 'Financial Services', 'Healthcare', 'Marketing & Advertising', 'E-commerce & Retail', 'Telecommunications', 'Education', 'Manufacturing', 'Consulting'];
 const SOURCE_NAMES = Object.keys(SOURCES);
 
+// A city picked from the suggestions; its centre is where the search looks
+const citySchema = z.object({
+    name: z.string().trim().min(1, 'City is required').max(100, 'City is too long'),
+    lat: z.number('Choose a city from the list').min(-90).max(90),
+    lon: z.number('Choose a city from the list').min(-180).max(180),
+});
+
 export const generateLeadsSchema = z.object({
     country: z.string().trim().min(1, 'Country is required').max(100, 'Country is too long'),
+    city: citySchema.optional(),
     industry: z.enum(INDUSTRIES, 'Choose a valid industry'),
     company_size: z.enum(COMPANY_SIZES, 'Choose a valid company size').optional(),
     keywords: z
@@ -42,6 +50,11 @@ const companyEmailSchema = z.object({
     email: z.string().trim().max(254),
     source_name: z.string().trim().max(50),
     source_url: z.string().trim().max(2000),
+});
+
+export const findCitiesSchema = z.object({
+    country: z.string().trim().min(1, 'Country is required').max(100, 'Country is too long'),
+    text: z.string().trim().min(2, 'Type at least 2 letters').max(100, 'City is too long'),
 });
 
 // The lead's current people and emails come along so Hunter's results merge into them

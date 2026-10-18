@@ -7,6 +7,13 @@ export type User = {
     is_email_verified: boolean
 }
 
+export type City = {
+    name: string
+    region: string | null
+    lat: number
+    lon: number
+}
+
 export type MxStatus = 'found' | 'not_found' | 'error' | 'not_checked'
 
 export type FitLabel = 'good_fit' | 'needs_review' | 'poor_fit'

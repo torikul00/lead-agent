@@ -3,8 +3,10 @@ import { z } from 'zod'
 import { Briefcase, Code, Cpu, Factory, GraduationCap, HeartPulse, Landmark, Megaphone, RadioTower, ShoppingCart, Tag, X, type LucideIcon } from 'lucide-react'
 import SelectField from '@/components/SelectField.tsx'
 import SubmitButton from '@/components/SubmitButton.tsx'
+import CityField from '@/components/leads/CityField.tsx'
 import { COMPANY_SIZES, COUNTRIES, DEFAULT_LEADS, INDUSTRIES, MAX_KEYWORDS, MAX_LEADS } from '@/constants/leads.ts'
 import { leadSearchSchema, type LeadSearchInput } from '@/schemas/lead.ts'
+import type { City } from '@/types/index.ts'
 
 const INDUSTRY_ICONS: Record<(typeof INDUSTRIES)[number], LucideIcon> = {
     'Technology': Cpu,
@@ -33,6 +35,7 @@ type LeadSearchFormProps = {
 export default function LeadSearchForm({ loading, onSearch }: LeadSearchFormProps) {
     const [industry, setIndustry] = useState('')
     const [country, setCountry] = useState('Sweden')
+    const [city, setCity] = useState<City | null>(null)
     const [companySize, setCompanySize] = useState('')
     const [limit, setLimit] = useState(DEFAULT_LEADS)
     const [keywords, setKeywords] = useState<string[]>([])
@@ -57,6 +60,12 @@ export default function LeadSearchForm({ loading, onSearch }: LeadSearchFormProp
         }
     }
 
+    // A city belongs to one country, so picking another country clears it
+    const changeCountry = (value: string) => {
+        setCountry(value)
+        setCity(null)
+    }
+
     const handleSubmit = (e: SubmitEvent<HTMLFormElement>) => {
         e.preventDefault()
 
@@ -68,6 +77,7 @@ export default function LeadSearchForm({ loading, onSearch }: LeadSearchFormProp
 
         const result = leadSearchSchema.safeParse({
             country,
+            city: city ? { name: city.name, lat: city.lat, lon: city.lon } : undefined,
             industry,
             company_size: companySize || undefined,
             keywords: allKeywords,
@@ -85,9 +95,10 @@ export default function LeadSearchForm({ loading, onSearch }: LeadSearchFormProp
 
     return (
         <form onSubmit={handleSubmit} noValidate className="rounded-2xl border border-slate-200 bg-white p-5">
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
                 <SelectField id="industry" label="Industry" options={industryOptions} value={industry} onChange={setIndustry} placeholder="Select an industry" error={errors.industry?.[0]} />
-                <SelectField id="country" label="Country" options={countryOptions} value={country} onChange={setCountry} searchable />
+                <SelectField id="country" label="Country" options={countryOptions} value={country} onChange={changeCountry} searchable />
+                <CityField country={country} value={city} onChange={setCity} />
                 <SelectField id="company_size" label="Company size" options={sizeOptions} value={companySize} onChange={setCompanySize} />
 
                 <div>

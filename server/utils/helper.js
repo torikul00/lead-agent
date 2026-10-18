@@ -145,9 +145,9 @@ const getFitLabel = (score) => {
 };
 
 // Rule-based score (0-100) with a readable reason for each rule
-const scoreLead = (lead, { company_size, keywords }) => {
+const scoreLead = (lead, { company_size, keywords, city }) => {
     let score = 20;
-    const reasons = [`Matches ${lead.country} and the selected industry`];
+    const reasons = [`Matches ${city ? `${city.name}, ` : ''}${lead.country} and the selected industry`];
 
     if (!company_size) {
         score += 25;

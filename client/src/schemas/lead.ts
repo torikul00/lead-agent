@@ -3,6 +3,7 @@ import { COMPANY_SIZES, COUNTRIES, INDUSTRIES, MAX_KEYWORDS, MAX_LEADS } from '@
 
 export const leadSearchSchema = z.object({
     country: z.enum(COUNTRIES, 'Choose a country'),
+    city: z.object({ name: z.string(), lat: z.number(), lon: z.number() }).optional(),
     industry: z.enum(INDUSTRIES, 'Choose an industry'),
     company_size: z.enum(COMPANY_SIZES).optional(),
     keywords: z
