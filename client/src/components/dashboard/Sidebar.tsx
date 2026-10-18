@@ -1,8 +1,7 @@
 import { NavLink } from 'react-router'
-import { LayoutDashboard, Radar, Search, X } from 'lucide-react'
+import { Radar, Search, X } from 'lucide-react'
 
 const navItems = [
-    { to: '/', label: 'Overview', icon: LayoutDashboard },
     { to: '/search-leads', label: 'Search leads', icon: Search },
 ]
 

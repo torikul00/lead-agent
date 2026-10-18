@@ -7,5 +7,5 @@ export default function GuestRoute() {
     const loading = useAuthStore((state) => state.loading)
 
     if (loading) return <PageLoader />
-    return user ? <Navigate to="/" replace /> : <Outlet />
+    return user ? <Navigate to="/search-leads" replace /> : <Outlet />
 }

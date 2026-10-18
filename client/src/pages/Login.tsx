@@ -36,7 +36,7 @@ export default function Login() {
         try {
             const { data } = await api.post('/users/login', result.data)
             setUser(data.user)
-            navigate('/')
+            navigate('/search-leads')
         } catch (err) {
             setServerError(getErrorMessage(err))
         } finally {
