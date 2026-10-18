@@ -1,5 +1,7 @@
 import { Fragment, useState } from 'react'
-import { Check, ChevronDown, Copy, ExternalLink, Mail, Phone } from 'lucide-react'
+import { Check, Copy, ExternalLink, LoaderCircle, Mail, Phone } from 'lucide-react'
+import api from '@/lib/axios.ts'
+import getErrorMessage from '@/lib/getErrorMessage.ts'
 import type { Contact, FitLabel, Lead, MxStatus } from '@/types/index.ts'
 
 const FIT_LABELS: Record<FitLabel, { label: string; className: string }> = {
@@ -68,9 +70,15 @@ function ContactItem({ contact }: { contact: Contact }) {
             </div>
             {contact.title !== contact.role && <p className="truncate text-xs text-slate-500" title={contact.title}>{contact.title}</p>}
 
-            {(contact.email || contact.linkedin_url) && (
-                <div className="mt-1 flex min-w-0 items-center gap-3">
+            {(contact.email || contact.phone || contact.linkedin_url) && (
+                <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5">
                     {contact.email && <EmailLink email={contact.email} />}
+                    {contact.phone && (
+                        <a href={`tel:${contact.phone}`} className="inline-flex shrink-0 items-center gap-1 text-xs text-slate-600 transition hover:text-primary">
+                            <Phone className="size-3" />
+                            {contact.phone}
+                        </a>
+                    )}
                     {contact.linkedin_url && (
                         <a href={contact.linkedin_url} target="_blank" rel="noopener noreferrer" className="shrink-0 text-xs font-medium text-slate-500 transition hover:text-primary">LinkedIn</a>
                     )}
@@ -80,7 +88,43 @@ function ContactItem({ contact }: { contact: Contact }) {
     )
 }
 
-export default function LeadsTable({ leads }: { leads: Lead[] }) {
+// Looks the company up on Hunter; that spends Hunter credits, so it only runs on click
+function FindEmailsButton({ lead, onUpdate }: { lead: Lead; onUpdate: (lead: Lead) => void }) {
+    const [loading, setLoading] = useState(false)
+    const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null)
+
+    const findEmails = async () => {
+        setLoading(true)
+        setMessage(null)
+
+        try {
+            const { data } = await api.post('/leads/find_emails', { domain: lead.domain, contacts: lead.contacts, company_emails: lead.company_emails })
+            onUpdate({ ...lead, contacts: data.contacts, company_emails: data.company_emails })
+            setMessage({ text: data.new_emails ? `${data.new_emails} new ${data.new_emails === 1 ? 'email' : 'emails'} found` : 'No new emails found', error: false })
+        } catch (err) {
+            setMessage({ text: getErrorMessage(err), error: true })
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    return (
+        <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+            {message && <span className={`text-xs ${message.error ? 'text-red-600' : 'text-slate-500'}`}>{message.text}</span>}
+            <button type="button" onClick={findEmails} disabled={loading} className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60">
+                {loading ? <LoaderCircle className="size-3.5 animate-spin" /> : <Mail className="size-3.5" />}
+                {loading ? 'Finding emails...' : 'Find emails'}
+            </button>
+        </div>
+    )
+}
+
+type LeadsTableProps = {
+    leads: Lead[]
+    onLeadUpdate: (lead: Lead) => void
+}
+
+export default function LeadsTable({ leads, onLeadUpdate }: LeadsTableProps) {
     const [openRow, setOpenRow] = useState<string | null>(null)
 
     return (
@@ -94,8 +138,7 @@ export default function LeadsTable({ leads }: { leads: Lead[] }) {
                         <th className="px-4 py-3">Location</th>
                         <th className="px-4 py-3">Contacts</th>
                         <th className="px-4 py-3">Mail server</th>
-                        <th className="px-4 py-3">Score</th>
-                        <th className="w-12 px-4 py-3"><span className="sr-only">Details</span></th>
+                        <th className="py-3 pr-6 pl-4">Score</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -106,19 +149,37 @@ export default function LeadsTable({ leads }: { leads: Lead[] }) {
                         const mx = MX_LABELS[lead.mx_status]
                         const [firstContact] = lead.contacts
                         const emailCount = lead.company_emails.length + lead.contacts.filter((contact) => contact.email).length
+                        const toggle = () => setOpenRow(open ? null : key)
 
                         return (
                             <Fragment key={key}>
-                                <tr className={`transition hover:bg-slate-50/80 ${open ? 'bg-slate-50/80' : ''}`}>
+                                {/* The whole row opens the details; Enter or Space does the same for keyboard users */}
+                                <tr
+                                    onClick={toggle}
+                                    onKeyDown={(e) => {
+                                        if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return
+                                        e.preventDefault()
+                                        toggle()
+                                    }}
+                                    tabIndex={0}
+                                    aria-expanded={open}
+                                    className={`cursor-pointer transition outline-none hover:bg-slate-50/80 focus-visible:bg-slate-100 ${open ? 'bg-slate-50/80' : ''}`}
+                                >
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-3">
-                                            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 font-semibold text-primary">
-                                                {lead.name.charAt(0).toUpperCase()}
-                                            </div>
+                                            {lead.domain ? (
+                                                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white">
+                                                    <img src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(lead.domain)}&sz=128`} alt={`${lead.name} favicon`} width={32} height={32} className="rounded" />
+                                                </div>
+                                            ) : (
+                                                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 font-semibold text-primary">
+                                                    {lead.name.charAt(0).toUpperCase()}
+                                                </div>
+                                            )}
                                             <div className="min-w-0">
                                                 <p className="truncate font-medium text-slate-900">{lead.name}</p>
                                                 {lead.domain && (
-                                                    <a href={lead.website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-slate-500 transition hover:text-primary">
+                                                    <a href={lead.website} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 text-xs text-slate-500 transition hover:text-primary">
                                                         {lead.domain}
                                                         <ExternalLink className="size-3" />
                                                     </a>
@@ -158,7 +219,7 @@ export default function LeadsTable({ leads }: { leads: Lead[] }) {
                                             {mx.label}
                                         </span>
                                     </td>
-                                    <td className="px-4 py-4">
+                                    <td className="py-4 pr-6 pl-4">
                                         <div className="flex items-center gap-3">
                                             <span className="w-7 font-semibold text-slate-900">{lead.score}</span>
                                             <div className="h-1.5 w-16 overflow-hidden rounded-full bg-slate-100">
@@ -167,16 +228,11 @@ export default function LeadsTable({ leads }: { leads: Lead[] }) {
                                         </div>
                                         <span className={`mt-1.5 inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${fit.className}`}>{fit.label}</span>
                                     </td>
-                                    <td className="px-4 py-4">
-                                        <button type="button" onClick={() => setOpenRow(open ? null : key)} aria-expanded={open} aria-label={open ? 'Hide details' : 'Show details'} className="cursor-pointer rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600">
-                                            <ChevronDown className={`size-4 transition ${open ? 'rotate-180' : ''}`} />
-                                        </button>
-                                    </td>
                                 </tr>
 
                                 {open && (
                                     <tr className="bg-slate-50/80">
-                                        <td colSpan={8} className="px-6 pb-4">
+                                        <td colSpan={7} className="px-6 pb-4">
                                             <div className="grid grid-cols-[1fr_2fr_1fr] gap-6 rounded-xl border border-slate-200 bg-white p-4">
                                                 <div>
                                                     <h3 className="text-xs font-medium tracking-wide text-slate-500 uppercase">About</h3>
@@ -184,13 +240,16 @@ export default function LeadsTable({ leads }: { leads: Lead[] }) {
                                                 </div>
 
                                                 <div className="min-w-0">
-                                                    <h3 className="text-xs font-medium tracking-wide text-slate-500 uppercase">Decision makers</h3>
+                                                    <div className="flex items-center justify-between gap-3">
+                                                        <h3 className="text-xs font-medium tracking-wide text-slate-500 uppercase">Decision makers</h3>
+                                                        {lead.domain && <FindEmailsButton lead={lead} onUpdate={onLeadUpdate} />}
+                                                    </div>
                                                     {lead.contacts.length > 0 ? (
-                                                        <ul className="mt-1.5 grid grid-cols-2 gap-2">
+                                                        <ul className="mt-2 grid grid-cols-2 gap-2">
                                                             {lead.contacts.map((contact) => <ContactItem key={contact.name} contact={contact} />)}
                                                         </ul>
                                                     ) : (
-                                                        <p className="mt-1.5 text-sm text-slate-500">No decision makers found.</p>
+                                                        <p className="mt-2 text-sm text-slate-500">No decision makers found.</p>
                                                     )}
                                                 </div>
 

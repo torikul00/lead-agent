@@ -177,6 +177,7 @@ const findCard = ($, el) => {
             return {
                 name: [...names][0],
                 email: block.find('a[href^="mailto:"]').attr('href'),
+                phone: block.find('a[href^="tel:"]').attr('href'),
                 linkedin_url: block.find('a[href*="linkedin.com/in/"]').attr('href'),
             };
         }
@@ -249,7 +250,7 @@ const readStructuredData = ($) => {
                 const title = [].concat(item.jobTitle)[0];
                 const linkedin = [].concat(item.sameAs).find((link) => typeof link === 'string' && link.includes('linkedin.com/in/'));
                 if (typeof item.name === 'string' && typeof title === 'string') {
-                    found.people.push({ name: item.name, title, email: item.email, linkedin_url: linkedin });
+                    found.people.push({ name: item.name, title, email: item.email, phone: [].concat(item.telephone)[0], linkedin_url: linkedin });
                 }
             } else {
                 found.emails.push(...[].concat(item.email).filter((email) => typeof email === 'string'));
@@ -341,9 +342,15 @@ const findOwner = (contacts, email) => {
     return owners.length === 1 ? owners[0] : null;
 };
 
+// Digits only, so "+1 (555) 010-0100" and "+15550100100" compare equal
+const phoneDigits = (phone) => phone.replace(/\D/g, '');
+
 // Add what the pages show; only emails on the company's own domain count, so agency or plugin addresses are skipped
 const addFindings = (lead, pages, domains) => {
     const isCompanyEmail = (email) => domains.some((domain) => domain && (email.endsWith(`@${domain}`) || email.endsWith(`.${domain}`)));
+
+    // The homepage's number is the company's, so it isn't kept as anyone's personal phone
+    const companyPhones = new Set([lead.phone, ...pages[0].phones.map(cleanPhone)].filter(Boolean).map(phoneDigits));
 
     for (const page of pages) {
         for (const person of page.people) {
@@ -352,11 +359,13 @@ const addFindings = (lead, pages, domains) => {
             if (!looksLikeName(name) || !isDecisionMakerTitle(title)) continue;
 
             const email = cleanEmail(person.email);
+            const phone = cleanPhone(person.phone);
             addContact(lead, {
                 name,
                 title,
                 role: getRole(title),
                 email: email && isCompanyEmail(email) && !SHARED_MAILBOXES.has(email.split('@')[0]) ? email : null,
+                phone: phone && !companyPhones.has(phoneDigits(phone)) ? phone : null,
                 linkedin_url: cleanLinkedIn(person.linkedin_url, page.url),
                 source_name: SOURCE_NAME,
                 source_url: page.url,

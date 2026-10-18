@@ -72,20 +72,33 @@ export const getRole = (title) => {
     return ROLES.find(([, pattern]) => pattern.test(title))?.[0] ?? null;
 };
 
+// Same person when first and last names match, so "Jane Q. Smith" and "Jane Smith" merge
+const isSamePerson = (a, b) => {
+    const first = normalizePersonName(a).split(' ');
+    const second = normalizePersonName(b).split(' ');
+    return first[0] === second[0] && first.at(-1) === second.at(-1);
+};
+
+// Known roles in priority order; any other role (e.g. "Decision maker" from Hunter) goes last
+const roleRank = (role) => (ROLE_ORDER.includes(role) ? ROLE_ORDER.indexOf(role) : ROLE_ORDER.length);
+
 // Add a person once per lead, most senior first; a second source only fills in what's missing
 export const addContact = (lead, contact) => {
-    const key = normalizePersonName(contact.name);
-    const existing = lead.contacts.find((item) => normalizePersonName(item.name) === key);
+    const existing = lead.contacts.find((item) => isSamePerson(item.name, contact.name));
     if (existing) {
         existing.email ??= contact.email;
+        existing.phone ??= contact.phone;
         existing.linkedin_url ??= contact.linkedin_url;
         return;
     }
 
     if (lead.contacts.length >= MAX_CONTACTS) return;
     lead.contacts.push(contact);
-    lead.contacts.sort((a, b) => ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role));
+    lead.contacts.sort((a, b) => roleRank(a.role) - roleRank(b.role));
 };
+
+// Emails a lead has, on the company and on its people
+export const countEmails = (lead) => lead.company_emails.length + lead.contacts.filter((contact) => contact.email).length;
 
 // Add a company email once, unless it already belongs to one of the lead's people
 export const addCompanyEmail = (lead, entry) => {

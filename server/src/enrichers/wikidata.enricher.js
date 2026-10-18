@@ -74,6 +74,7 @@ export default {
                 title,
                 role: getRole(title),
                 email: null,
+                phone: null,
                 linkedin_url: linkedin ? `https://www.linkedin.com/in/${linkedin}` : null,
                 source_name: 'Wikidata',
                 source_url: url,

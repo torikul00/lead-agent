@@ -17,8 +17,8 @@ export default function exportLeadsCsv(leads: Lead[]) {
         lead.employee_count,
         lead.address,
         lead.country,
-        // "Jane Smith (CEO) <jane@acme.com>; John Doe (Founder)"
-        lead.contacts.map((contact) => `${contact.name} (${contact.title})${contact.email ? ` <${contact.email}>` : ''}`).join('; '),
+        // "Jane Smith (CEO) <jane@acme.com> +1 555 0100; John Doe (Founder)"
+        lead.contacts.map((contact) => `${contact.name} (${contact.title})${contact.email ? ` <${contact.email}>` : ''}${contact.phone ? ` ${contact.phone}` : ''}`).join('; '),
         [...lead.contacts.flatMap((contact) => contact.email ?? []), ...lead.company_emails.map((item) => item.email)].join('; '),
         lead.phone,
         lead.description,

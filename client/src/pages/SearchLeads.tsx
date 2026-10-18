@@ -33,6 +33,11 @@ export default function SearchLeads() {
         }
     }
 
+    // Swap in a lead after Hunter adds its emails
+    const updateLead = (updated: Lead) => {
+        setResult((current) => current && { ...current, leads: current.leads.map((lead) => (lead.domain === updated.domain ? updated : lead)) })
+    }
+
     return (
         <div className="space-y-6">
             <div>
@@ -86,7 +91,7 @@ export default function SearchLeads() {
                     </div>
 
                     {result.leads.length > 0 ? (
-                        <LeadsTable leads={result.leads} />
+                        <LeadsTable leads={result.leads} onLeadUpdate={updateLead} />
                     ) : (
                         <div className="flex flex-col items-center px-6 py-16 text-center">
                             <SearchX className="size-8 text-slate-400" />

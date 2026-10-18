@@ -32,7 +32,7 @@ type LeadSearchFormProps = {
 
 export default function LeadSearchForm({ loading, onSearch }: LeadSearchFormProps) {
     const [industry, setIndustry] = useState('')
-    const [country, setCountry] = useState('United States')
+    const [country, setCountry] = useState('Sweden')
     const [companySize, setCompanySize] = useState('')
     const [limit, setLimit] = useState(DEFAULT_LEADS)
     const [keywords, setKeywords] = useState<string[]>([])

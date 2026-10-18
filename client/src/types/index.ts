@@ -16,6 +16,7 @@ export type Contact = {
     title: string
     role: string
     email: string | null
+    phone: string | null
     linkedin_url: string | null
     source_name: string
     source_url: string

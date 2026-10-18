@@ -1,7 +1,8 @@
 import { SOURCES } from '../sources/index.js';
 import { ENRICHERS } from '../enrichers/index.js';
+import hunter from '../enrichers/hunter.enricher.js';
 import { SHORTLIST_SIZE } from '../../utils/constants.js';
-import { checkMx, dedupeLeads, normalizeDomain, rankLeads } from '../../utils/helper.js';
+import { checkMx, countEmails, dedupeLeads, normalizeDomain, rankLeads } from '../../utils/helper.js';
 
 // POST /api/leads/generate_leads — find companies from the selected sources and return the top matches with their decision makers.
 export const generateLeads = async (req, res) => {
@@ -60,5 +61,24 @@ export const generateLeads = async (req, res) => {
     } catch (err) {
         console.error('Lead generation failed:', err);
         return res.status(500).json({ error: 'Could not generate leads right now. Please try again.' });
+    }
+};
+
+// POST /api/leads/find_emails — look up one company's decision makers on Hunter; it spends Hunter credits, so it only runs when asked
+export const findEmails = async (req, res) => {
+    try {
+        const lead = req.body;
+        const emailsBefore = countEmails(lead);
+        await hunter.enrich([lead]);
+
+        return res.status(200).json({
+            contacts: lead.contacts,
+            company_emails: lead.company_emails,
+            new_emails: countEmails(lead) - emailsBefore,
+        });
+    } catch (err) {
+        // The reason (bad key, no credits left...) stays in the server log; users get a general message
+        console.error('Email lookup failed:', err);
+        return res.status(502).json({ error: 'Could not find emails right now. Please try again later.' });
     }
 };
