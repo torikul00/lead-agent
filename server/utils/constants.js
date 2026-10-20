@@ -6,6 +6,9 @@ export const SHORTLIST_SIZE = 20;
 // A stored MX result is reused for this many days before the domain is looked up again
 export const MX_CACHE_DAYS = 30;
 
+// Email providers a template can have its own version for; leads on any other provider use "other"
+export const TEMPLATE_VARIANT_KEYS = ['google_workspace', 'microsoft_365', 'zoho', 'godaddy', 'hostinger', 'titan', 'ionos', 'namecheap', 'other'];
+
 // A selected city covers its metro area: companies within this distance of the city centre
 export const CITY_RADIUS_KM = 30;
 

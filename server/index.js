@@ -9,6 +9,7 @@ import helmet from 'helmet';
 import { apiLimiter } from './middlewares/rateLimit.middleware.js';
 import userRoutes from './src/routes/user.routes.js';
 import leadRoutes from './src/routes/lead.routes.js';
+import emailRoutes from './src/routes/email.routes.js';
 
 connectDB();
 
@@ -63,6 +64,7 @@ app.get("/health", async (req, res) => {
 app.use('/api', apiLimiter);
 app.use('/api/users', userRoutes);
 app.use('/api/leads', leadRoutes);
+app.use('/api/emails', emailRoutes);
 
 // One HTTP server: REST + Socket.IO on the same port (Render / Netlify-friendly)
 const httpServer = createHttpServer(app);

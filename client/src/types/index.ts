@@ -63,6 +63,20 @@ export type LeadList = {
     created_at: string
 }
 
+export type TemplateVariantKey = 'google_workspace' | 'microsoft_365' | 'zoho' | 'godaddy' | 'hostinger' | 'titan' | 'ionos' | 'namecheap' | 'other'
+
+export type EmailContent = {
+    subject: string
+    body: string
+}
+
+export type EmailTemplate = EmailContent & {
+    id: string
+    name: string
+    variants: Record<TemplateVariantKey, EmailContent | null>
+    updated_at: string
+}
+
 export type AuthState = {
     user: User | null
     loading: boolean

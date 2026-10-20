@@ -7,6 +7,7 @@ import SearchLeads from '@/pages/SearchLeads.tsx'
 import LeadLists from '@/pages/LeadLists.tsx'
 import LeadListDetails from '@/pages/LeadListDetails.tsx'
 import EmailTemplates from '@/pages/EmailTemplates.tsx'
+import EmailTemplateForm from '@/pages/EmailTemplateForm.tsx'
 import Login from '@/pages/Login.tsx'
 import Signup from '@/pages/Signup.tsx'
 
@@ -21,6 +22,8 @@ export default function AppRouter() {
                         <Route path="/lead-lists" element={<LeadLists />} />
                         <Route path="/lead-lists/:id" element={<LeadListDetails />} />
                         <Route path="/email-templates" element={<EmailTemplates />} />
+                        <Route path="/email-templates/new" element={<EmailTemplateForm />} />
+                        <Route path="/email-templates/:id/edit" element={<EmailTemplateForm />} />
                         <Route path="/profile" element={<Profile />} />
                     </Route>
                 </Route>
