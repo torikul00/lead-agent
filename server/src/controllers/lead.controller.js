@@ -1,9 +1,10 @@
+import DomainMxRecord from '../models/domainMxRecord.model.js';
 import { SOURCES } from '../sources/index.js';
 import { ENRICHERS } from '../enrichers/index.js';
 import hunter from '../enrichers/hunter.enricher.js';
 import { searchCities } from '../sources/geoapify.source.js';
 import { SHORTLIST_SIZE } from '../../utils/constants.js';
-import { checkMx, countEmails, dedupeLeads, normalizeDomain, rankLeads } from '../../utils/helper.js';
+import { countEmails, dedupeLeads, normalizeDomain, rankLeads } from '../../utils/helper.js';
 
 // POST /api/leads/generate_leads — find companies from the selected sources and return the top matches with their decision makers.
 export const generateLeads = async (req, res) => {
@@ -35,13 +36,17 @@ export const generateLeads = async (req, res) => {
             ...lead,
             domain: normalizeDomain(lead.website),
             mx_status: 'not_checked',
+            email_provider: null,
             contacts: [],
         })));
 
-        // Check MX only for the best candidates to keep the search fast
+        // Check MX only for the best candidates to keep the search fast; leads without a domain stay "not_checked"
         const shortlist = rankLeads(leads, req.body).slice(0, Math.max(limit, SHORTLIST_SIZE));
         await Promise.all(shortlist.map(async (lead) => {
-            lead.mx_status = await checkMx(lead.domain);
+            if (!lead.domain) return;
+            const mx = await DomainMxRecord.getMx(lead.domain);
+            lead.mx_status = mx.mx_status;
+            lead.email_provider = mx.email_provider;
         }));
 
         // Find people and emails for the final leads only; a failed enricher is skipped like a failed source

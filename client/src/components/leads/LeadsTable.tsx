@@ -243,7 +243,7 @@ export default function LeadsTable({ leads, selected, onSelectedChange, onLeadUp
                                     <td className="px-4 py-4">
                                         <span className="inline-flex items-center gap-2 text-slate-600">
                                             <span className={`size-2 rounded-full ${mx.dot}`} />
-                                            {mx.label}
+                                            {lead.email_provider === 'Other' ? 'Other provider' : (lead.email_provider ?? mx.label)}
                                         </span>
                                     </td>
                                     <td className="py-4 pr-6 pl-4">

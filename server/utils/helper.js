@@ -48,14 +48,47 @@ export const dedupeLeads = (leads) => {
     return [...unique.values()];
 };
 
+// Mail hosts of known providers, matched against a domain's MX hosts
+const EMAIL_PROVIDERS = [
+    ['Google Workspace', /(^|\.)(google|googlemail)\.com$/],
+    ['Microsoft 365', /\.mail\.protection\.outlook\.com$|\.mx\.microsoft$/],
+    ['Zoho', /(^|\.)zoho(mail)?\.[a-z.]+$/],
+    ['Proton Mail', /(^|\.)protonmail\.ch$/],
+    ['Fastmail', /(^|\.)messagingengine\.com$/],
+    ['Yandex 360', /(^|\.)yandex\.(net|ru)$/],
+    ['iCloud', /(^|\.)mail\.icloud\.com$/],
+    ['Amazon WorkMail', /^inbound-smtp\.[a-z0-9-]+\.amazonaws\.com$/],
+    ['GoDaddy', /(^|\.)secureserver\.net$/],
+    ['IONOS', /(^|\.)(ionos\.[a-z.]+|1and1\.[a-z.]+|kundenserver\.de)$/],
+    ['OVH', /(^|\.)ovh\.net$/],
+    ['Titan', /(^|\.)titan\.email$/],
+    ['Hostinger', /(^|\.)hostinger\.com$/],
+    ['Namecheap', /(^|\.)privateemail\.com$/],
+    ['Rackspace', /(^|\.)emailsrvr\.com$/],
+];
+
+// ["aspmx.l.google.com", ...] -> "Google Workspace"; a mail host on the company's own domain is "Self-hosted"
+const detectEmailProvider = (hosts, domain) => {
+    const provider = EMAIL_PROVIDERS.find(([, pattern]) => hosts.some((host) => pattern.test(host)));
+    if (provider) return provider[0];
+    return hosts.some((host) => host === domain || host.endsWith(`.${domain}`)) ? 'Self-hosted' : 'Other';
+};
+
 // MX records only show the domain can receive mail, not that any address exists
 export const checkMx = async (domain) => {
-    if (!domain) return 'not_checked';
     try {
-        const records = await resolver.resolveMx(domain);
-        return records.length ? 'found' : 'not_found';
+        // A "null MX" (a single "." record) means the domain takes no mail, so it's dropped
+        const records = (await resolver.resolveMx(domain))
+            .map((record) => ({ exchange: record.exchange.toLowerCase().replace(/\.$/, ''), priority: record.priority }))
+            .filter((record) => record.exchange)
+            .sort((a, b) => a.priority - b.priority);
+
+        if (!records.length) return { mx_status: 'not_found', mx_records: [], email_provider: null };
+        return { mx_status: 'found', mx_records: records, email_provider: detectEmailProvider(records.map((record) => record.exchange), domain) };
     } catch (err) {
-        return ['ENOTFOUND', 'ENODATA'].includes(err.code) ? 'not_found' : 'error';
+        // ENOTFOUND: the domain doesn't exist, ENODATA: it has no MX records; anything else (timeout...) is a failed lookup
+        const mxStatus = ['ENOTFOUND', 'ENODATA'].includes(err.code) ? 'not_found' : 'error';
+        return { mx_status: mxStatus, mx_records: [], email_provider: null };
     }
 };
 

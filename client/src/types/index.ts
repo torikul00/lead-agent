@@ -47,6 +47,7 @@ export type Lead = {
     source_name: string
     source_url: string | null
     mx_status: MxStatus
+    email_provider: string | null
     phone: string | null
     company_emails: CompanyEmail[]
     contacts: Contact[]
