@@ -17,3 +17,9 @@ export const leadSearchSchema = z.object({
 })
 
 export type LeadSearchInput = z.infer<typeof leadSearchSchema>
+
+export const leadListSchema = z.object({
+    name: z.string().trim().min(1, 'List name is required').max(100, 'List name must be 100 characters or less'),
+})
+
+export type LeadListInput = z.infer<typeof leadListSchema>

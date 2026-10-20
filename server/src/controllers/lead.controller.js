@@ -1,4 +1,7 @@
+import { isValidObjectId } from 'mongoose';
 import DomainMxRecord from '../models/domainMxRecord.model.js';
+import Lead from '../models/lead.model.js';
+import LeadList from '../models/leadList.model.js';
 import { SOURCES } from '../sources/index.js';
 import { ENRICHERS } from '../enrichers/index.js';
 import hunter from '../enrichers/hunter.enricher.js';
@@ -98,5 +101,61 @@ export const findEmails = async (req, res) => {
         // The reason (bad key, no credits left...) stays in the server log; users get a general message
         console.error('Email lookup failed:', err);
         return res.status(502).json({ error: 'Could not find emails right now. Please try again later.' });
+    }
+};
+
+// Only what the client shows for a list
+const formatLeadList = (list) => ({
+    id: list._id,
+    name: list.name,
+    lead_count: list.lead_count,
+    created_at: list.createdAt,
+});
+
+// POST /api/leads/save_list — save the chosen leads as a named list, along with the search that found them
+export const saveLeadList = async (req, res) => {
+    try {
+        const { name, search_query, searched_at, leads } = req.body;
+        const list = await LeadList.create({ user_id: req.user._id, name, search_query, searched_at, lead_count: leads.length });
+
+        // Remove the list again if its leads can't be saved, so no empty list is left behind
+        try {
+            await Lead.insertMany(leads.map((lead) => ({ ...lead, user_id: req.user._id, lead_list_id: list._id })));
+        } catch (err) {
+            await LeadList.deleteOne({ _id: list._id });
+            throw err;
+        }
+
+        return res.status(201).json({ list: formatLeadList(list) });
+    } catch (err) {
+        console.error('Saving lead list failed:', err);
+        return res.status(500).json({ error: 'Could not save the list right now. Please try again.' });
+    }
+};
+
+// GET /api/leads/lists — the user's saved lists, newest first
+export const getLeadLists = async (req, res) => {
+    try {
+        const lists = await LeadList.find({ user_id: req.user._id }).sort({ createdAt: -1 }).lean();
+        return res.status(200).json({ lists: lists.map(formatLeadList) });
+    } catch (err) {
+        console.error('Loading lead lists failed:', err);
+        return res.status(500).json({ error: 'Could not load your lists right now. Please try again.' });
+    }
+};
+
+// GET /api/leads/lists/:id — one of the user's lists with its leads, best score first
+export const getLeadList = async (req, res) => {
+    try {
+        const list = isValidObjectId(req.params.id) && await LeadList.findOne({ _id: req.params.id, user_id: req.user._id }).lean();
+        if (!list) {
+            return res.status(404).json({ error: 'List not found.' });
+        }
+
+        const leads = await Lead.find({ lead_list_id: list._id }).sort({ score: -1, _id: 1 }).select('-user_id -lead_list_id -__v').lean();
+        return res.status(200).json({ list: formatLeadList(list), leads });
+    } catch (err) {
+        console.error('Loading lead list failed:', err);
+        return res.status(500).json({ error: 'Could not load this list right now. Please try again.' });
     }
 };

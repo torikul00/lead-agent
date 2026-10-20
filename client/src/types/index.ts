@@ -56,6 +56,13 @@ export type Lead = {
     score_reasons: string[]
 }
 
+export type LeadList = {
+    id: string
+    name: string
+    lead_count: number
+    created_at: string
+}
+
 export type AuthState = {
     user: User | null
     loading: boolean

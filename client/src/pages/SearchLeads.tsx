@@ -1,17 +1,21 @@
 import { useState } from 'react'
-import { Download, LoaderCircle, SearchX, Sparkles, TriangleAlert } from 'lucide-react'
+import { Download, ListPlus, LoaderCircle, SearchX, Sparkles, TriangleAlert } from 'lucide-react'
 import api from '@/lib/axios.ts'
 import getErrorMessage from '@/lib/getErrorMessage.ts'
 import exportLeadsCsv from '@/lib/exportLeadsCsv.ts'
 import FormAlert from '@/components/FormAlert.tsx'
 import LeadSearchForm from '@/components/leads/LeadSearchForm.tsx'
 import LeadsTable from '@/components/leads/LeadsTable.tsx'
+import SaveLeadListModal from '@/components/leads/SaveLeadListModal.tsx'
 import type { LeadSearchInput } from '@/schemas/lead.ts'
 import type { Lead } from '@/types/index.ts'
 
+// The search that found the leads is kept so a saved list can store it
 type SearchResult = {
     leads: Lead[]
     failed_sources: string[]
+    search_query: LeadSearchInput
+    searched_at: string
 }
 
 export default function SearchLeads() {
@@ -19,15 +23,19 @@ export default function SearchLeads() {
     const [selected, setSelected] = useState<string[]>([])
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
+    const [saveModalOpen, setSaveModalOpen] = useState(false)
+    const [savedMessage, setSavedMessage] = useState('')
 
     const handleSearch = async (criteria: LeadSearchInput) => {
+        const searchedAt = new Date().toISOString()
         setLoading(true)
         setError('')
+        setSavedMessage('')
         setSelected([])
         console.log(criteria);
         try {
             const { data } = await api.post('/leads/generate_leads', criteria)
-            setResult(data)
+            setResult({ ...data, search_query: criteria, searched_at: searchedAt })
         } catch (err) {
             setError(getErrorMessage(err))
         } finally {
@@ -40,10 +48,14 @@ export default function SearchLeads() {
         setResult((current) => current && { ...current, leads: current.leads.map((lead) => (lead.domain === updated.domain ? updated : lead)) })
     }
 
-    // Export only the checked companies, or every lead when none are checked
-    const exportCsv = (leads: Lead[]) => {
-        const selectedLeads = leads.filter((lead) => selected.includes(lead.domain ?? lead.name))
-        exportLeadsCsv(selectedLeads.length ? selectedLeads : leads)
+    // Export and save use only the checked companies, or every lead when none are checked
+    const allLeads = result?.leads ?? []
+    const selectedLeads = allLeads.filter((lead) => selected.includes(lead.domain ?? lead.name))
+    const chosenLeads = selectedLeads.length ? selectedLeads : allLeads
+
+    const handleSaved = (name: string) => {
+        setSaveModalOpen(false)
+        setSavedMessage(`Saved ${chosenLeads.length} ${chosenLeads.length === 1 ? 'lead' : 'leads'} to "${name}".`)
     }
 
     return (
@@ -56,6 +68,7 @@ export default function SearchLeads() {
             <LeadSearchForm loading={loading} onSearch={handleSearch} />
 
             {error && <FormAlert message={error} />}
+            {savedMessage && <FormAlert type="success" message={savedMessage} />}
 
             {loading && (
                 <div className="flex flex-col items-center rounded-2xl border border-slate-200 bg-white px-6 py-16 text-center">
@@ -91,10 +104,16 @@ export default function SearchLeads() {
                         </div>
 
                         {result.leads.length > 0 && (
-                            <button type="button" onClick={() => exportCsv(result.leads)} className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">
-                                <Download className="size-4" />
-                                {selected.length ? 'Export Selected' : 'Export All'}
-                            </button>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <button type="button" onClick={() => setSaveModalOpen(true)} className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white transition hover:bg-primary/90">
+                                    <ListPlus className="size-4" />
+                                    Save leads list
+                                </button>
+                                <button type="button" onClick={() => exportLeadsCsv(chosenLeads)} className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">
+                                    <Download className="size-4" />
+                                    {selected.length ? 'Export Selected' : 'Export All'}
+                                </button>
+                            </div>
                         )}
                     </div>
 
@@ -110,6 +129,10 @@ export default function SearchLeads() {
                         </div>
                     )}
                 </section>
+            )}
+
+            {saveModalOpen && result && (
+                <SaveLeadListModal leads={chosenLeads} searchQuery={result.search_query} searchedAt={result.searched_at} onClose={() => setSaveModalOpen(false)} onSaved={handleSaved} />
             )}
         </div>
     )

@@ -63,3 +63,32 @@ export const findEmailsSchema = z.object({
     contacts: z.array(contactSchema).max(MAX_CONTACTS).default([]),
     company_emails: z.array(companyEmailSchema).max(MAX_COMPANY_EMAILS).default([]),
 });
+
+// A lead as the search returned it
+const savedLeadSchema = z.object({
+    name: z.string().trim().min(1).max(300),
+    website: z.string().trim().max(2000).nullable().default(null),
+    domain: z.string().trim().max(253).nullable().default(null),
+    country: z.string().trim().min(1).max(100),
+    industry: z.string().trim().max(500).nullable().default(null),
+    employee_count: z.number().min(0).nullable().default(null),
+    address: z.string().trim().max(500).nullable().default(null),
+    description: z.string().trim().max(5000).nullable().default(null),
+    phone: z.string().trim().max(100).nullable().default(null),
+    source_name: z.string().trim().min(1).max(50),
+    source_url: z.string().trim().max(2000).nullable().default(null),
+    mx_status: z.enum(['found', 'not_found', 'error', 'not_checked']),
+    email_provider: z.string().trim().max(50).nullable().default(null),
+    contacts: z.array(contactSchema).max(MAX_CONTACTS).default([]),
+    company_emails: z.array(companyEmailSchema).max(MAX_COMPANY_EMAILS).default([]),
+    score: z.number().min(0).max(100),
+    fit_label: z.enum(['good_fit', 'needs_review', 'poor_fit']),
+    score_reasons: z.array(z.string().trim().max(500)).max(20).default([]),
+});
+
+export const saveLeadListSchema = z.object({
+    name: z.string().trim().min(1, 'List name is required').max(100, 'List name must be 100 characters or less'),
+    search_query: generateLeadsSchema,
+    searched_at: z.coerce.date('Search time is invalid'),
+    leads: z.array(savedLeadSchema).min(1, 'Choose at least one lead to save').max(MAX_LEADS, `You can save up to ${MAX_LEADS} leads`),
+});

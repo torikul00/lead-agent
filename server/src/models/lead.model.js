@@ -1,30 +1,44 @@
 import { Schema, model } from 'mongoose';
 
+const contactSchema = new Schema({
+    name: { type: String, required: true },
+    title: { type: String, required: true },
+    role: { type: String, required: true },
+    email: { type: String, default: null },
+    phone: { type: String, default: null },
+    linkedin_url: { type: String, default: null },
+    source_name: String,
+    source_url: String,
+}, { _id: false });
+
+const companyEmailSchema = new Schema({
+    email: { type: String, required: true },
+    source_name: String,
+    source_url: String,
+}, { _id: false });
+
+// A lead saved into a list, stored as the search returned it
 const leadSchema = new Schema({
     user_id: {
         type: Schema.Types.ObjectId,
         ref: 'User',
         required: true,
     },
-    search_job_id: {
+    lead_list_id: {
         type: Schema.Types.ObjectId,
-        ref: 'SearchJob',
-        default: null,
+        ref: 'LeadList',
+        required: true,
     },
     name: {
         type: String,
         required: true,
         trim: true,
     },
-    normalized_name: {
-        type: String,
-        required: true,
-    },
-    domain: {
+    website: {
         type: String,
         default: null,
     },
-    normalized_domain: {
+    domain: {
         type: String,
         default: null,
     },
@@ -32,11 +46,7 @@ const leadSchema = new Schema({
         type: String,
         required: true,
     },
-    category: {
-        type: String,
-        required: true,
-    },
-    address: {
+    industry: {
         type: String,
         default: null,
     },
@@ -44,11 +54,15 @@ const leadSchema = new Schema({
         type: Number,
         default: null,
     },
-    employee_range: {
+    address: {
         type: String,
         default: null,
     },
     description: {
+        type: String,
+        default: null,
+    },
+    phone: {
         type: String,
         default: null,
     },
@@ -65,39 +79,36 @@ const leadSchema = new Schema({
         enum: ['found', 'not_found', 'error', 'not_checked'],
         default: 'not_checked',
     },
-    website_status: {
+    email_provider: {
         type: String,
-        enum: ['reachable', 'unreachable', 'error', 'not_checked'],
-        default: 'not_checked',
+        default: null,
     },
-    ai_score: {
+    contacts: {
+        type: [contactSchema],
+        default: [],
+    },
+    company_emails: {
+        type: [companyEmailSchema],
+        default: [],
+    },
+    score: {
         type: Number,
         min: 0,
         max: 100,
-        default: null,
+        required: true,
     },
     fit_label: {
         type: String,
-        enum: ['good_fit', 'needs_review', 'poor_fit', null],
-        default: null,
+        enum: ['good_fit', 'needs_review', 'poor_fit'],
+        required: true,
     },
-    ai_reason: {
-        type: String,
-        default: null,
-    },
-    missing_information: {
+    score_reasons: {
         type: [String],
         default: [],
-    },
-    last_checked_at: {
-        type: Date,
-        default: null,
     }
 }, { timestamps: true });
 
-// One lead per domain for each user; leads without a domain are deduplicated in code
-leadSchema.index({ user_id: 1, normalized_domain: 1 }, { unique: true, partialFilterExpression: { normalized_domain: { $type: 'string' } } });
-leadSchema.index({ user_id: 1, createdAt: -1 });
+leadSchema.index({ lead_list_id: 1, score: -1 });
 
 const Lead = model('Lead', leadSchema);
 

@@ -1,8 +1,9 @@
 import { NavLink } from 'react-router'
-import { Mail, Radar, Search, X } from 'lucide-react'
+import { List, Mail, Radar, Search, X } from 'lucide-react'
 
 const navItems = [
     { to: '/search-leads', label: 'Search leads', icon: Search },
+    { to: '/lead-lists', label: 'Lead lists', icon: List },
     { to: '/email-templates', label: 'Email templates', icon: Mail },
 ]
 
@@ -35,7 +36,6 @@ export default function Sidebar({ collapsed, mobileOpen, onClose }: SidebarProps
                         <NavLink
                             key={to}
                             to={to}
-                            end
                             onClick={onClose}
                             title={collapsed ? label : undefined}
                             className={({ isActive }) => `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${collapsed ? 'lg:justify-center' : ''} ${isActive ? 'bg-primary/10 text-primary' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
