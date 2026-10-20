@@ -16,12 +16,14 @@ type SearchResult = {
 
 export default function SearchLeads() {
     const [result, setResult] = useState<SearchResult | null>(null)
+    const [selected, setSelected] = useState<string[]>([])
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
 
     const handleSearch = async (criteria: LeadSearchInput) => {
         setLoading(true)
         setError('')
+        setSelected([])
         console.log(criteria);
         try {
             const { data } = await api.post('/leads/generate_leads', criteria)
@@ -36,6 +38,12 @@ export default function SearchLeads() {
     // Swap in a lead after Hunter adds its emails
     const updateLead = (updated: Lead) => {
         setResult((current) => current && { ...current, leads: current.leads.map((lead) => (lead.domain === updated.domain ? updated : lead)) })
+    }
+
+    // Export only the checked companies, or every lead when none are checked
+    const exportCsv = (leads: Lead[]) => {
+        const selectedLeads = leads.filter((lead) => selected.includes(lead.domain ?? lead.name))
+        exportLeadsCsv(selectedLeads.length ? selectedLeads : leads)
     }
 
     return (
@@ -83,16 +91,16 @@ export default function SearchLeads() {
                         </div>
 
                         {result.leads.length > 0 && (
-                            <button type="button" onClick={() => exportLeadsCsv(result.leads)} className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">
+                            <button type="button" onClick={() => exportCsv(result.leads)} className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">
                                 <Download className="size-4" />
-                                Export CSV
+                                {selected.length ? 'Export Selected' : 'Export All'}
                             </button>
                         )}
                     </div>
 
                     {result.leads.length > 0 ? (
                         <>
-                            <LeadsTable leads={result.leads} onLeadUpdate={updateLead} />
+                            <LeadsTable leads={result.leads} selected={selected} onSelectedChange={setSelected} onLeadUpdate={updateLead} />
                         </>
                     ) : (
                         <div className="flex flex-col items-center px-6 py-16 text-center">

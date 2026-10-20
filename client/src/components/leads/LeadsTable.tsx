@@ -121,18 +121,35 @@ function FindEmailsButton({ lead, onUpdate }: { lead: Lead; onUpdate: (lead: Lea
 
 type LeadsTableProps = {
     leads: Lead[]
+    selected: string[]
+    onSelectedChange: (selected: string[]) => void
     onLeadUpdate: (lead: Lead) => void
 }
 
-export default function LeadsTable({ leads, onLeadUpdate }: LeadsTableProps) {
+export default function LeadsTable({ leads, selected, onSelectedChange, onLeadUpdate }: LeadsTableProps) {
     const [openRow, setOpenRow] = useState<string | null>(null)
+    const allSelected = leads.length > 0 && selected.length === leads.length
+
+    const toggleAll = () => onSelectedChange(allSelected ? [] : leads.map((lead) => lead.domain ?? lead.name))
 
     return (
         <div className="overflow-x-auto">
             <table className="w-full min-w-260 text-left text-sm">
                 <thead className="border-b border-slate-200 bg-slate-50/80 text-xs font-medium tracking-wide text-slate-500 uppercase">
                     <tr>
-                        <th className="px-6 py-3">Company</th>
+                        <th className="w-10 py-3 pr-2 pl-6">
+                            <input
+                                type="checkbox"
+                                checked={allSelected}
+                                ref={(el) => {
+                                    if (el) el.indeterminate = selected.length > 0 && !allSelected
+                                }}
+                                onChange={toggleAll}
+                                aria-label="Select all companies"
+                                className="size-4 cursor-pointer accent-primary"
+                            />
+                        </th>
+                        <th className="px-4 py-3">Company</th>
                         <th className="px-4 py-3">Industry</th>
                         <th className="px-4 py-3">Employees</th>
                         <th className="px-4 py-3">Location</th>
@@ -145,6 +162,7 @@ export default function LeadsTable({ leads, onLeadUpdate }: LeadsTableProps) {
                     {leads.map((lead) => {
                         const key = lead.domain ?? lead.name
                         const open = openRow === key
+                        const checked = selected.includes(key)
                         const fit = FIT_LABELS[lead.fit_label]
                         const mx = MX_LABELS[lead.mx_status]
                         const [firstContact] = lead.contacts
@@ -165,7 +183,16 @@ export default function LeadsTable({ leads, onLeadUpdate }: LeadsTableProps) {
                                     aria-expanded={open}
                                     className={`cursor-pointer transition outline-none hover:bg-slate-50/80 focus-visible:bg-slate-100 ${open ? 'bg-slate-50/80' : ''}`}
                                 >
-                                    <td className="px-6 py-4">
+                                    <td className="py-4 pr-2 pl-6" onClick={(e) => e.stopPropagation()}>
+                                        <input
+                                            type="checkbox"
+                                            checked={checked}
+                                            onChange={() => onSelectedChange(checked ? selected.filter((item) => item !== key) : [...selected, key])}
+                                            aria-label={`Select ${lead.name}`}
+                                            className="size-4 cursor-pointer accent-primary"
+                                        />
+                                    </td>
+                                    <td className="px-4 py-4">
                                         <div className="flex items-center gap-3">
                                             {lead.domain ? (
                                                 <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white">
@@ -232,7 +259,7 @@ export default function LeadsTable({ leads, onLeadUpdate }: LeadsTableProps) {
 
                                 {open && (
                                     <tr className="bg-slate-50/80">
-                                        <td colSpan={7} className="px-6 pb-4">
+                                        <td colSpan={8} className="px-6 pb-4">
                                             <div className="grid grid-cols-[1fr_2fr_1fr] gap-6 rounded-xl border border-slate-200 bg-white p-4">
                                                 <div>
                                                     <h3 className="text-xs font-medium tracking-wide text-slate-500 uppercase">About</h3>

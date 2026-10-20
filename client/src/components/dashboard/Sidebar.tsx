@@ -1,8 +1,9 @@
 import { NavLink } from 'react-router'
-import { Radar, Search, X } from 'lucide-react'
+import { Mail, Radar, Search, X } from 'lucide-react'
 
 const navItems = [
     { to: '/search-leads', label: 'Search leads', icon: Search },
+    { to: '/email-templates', label: 'Email templates', icon: Mail },
 ]
 
 type SidebarProps = {
