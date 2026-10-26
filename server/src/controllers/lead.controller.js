@@ -33,7 +33,7 @@ export const generateLeads = async (req, res) => {
         }
 
         // Some sources already know the company's phone or an email (OpenStreetMap), so those are kept
-        const leads = dedupeLeads(candidates.map((lead) => ({
+        let leads = dedupeLeads(candidates.map((lead) => ({
             phone: null,
             company_emails: [],
             ...lead,
@@ -42,6 +42,16 @@ export const generateLeads = async (req, res) => {
             email_provider: null,
             contacts: [],
         })));
+
+        const domains = leads.map((lead) => lead.domain).filter(Boolean);
+        if (domains.length) {
+            const savedDomains = await Lead.distinct('domain', {
+                user_id: req.user._id,
+                domain: { $in: domains },
+            });
+            const savedDomainSet = new Set(savedDomains);
+            leads = leads.filter((lead) => !savedDomainSet.has(lead.domain));
+        }
 
         // Check MX only for the best candidates to keep the search fast; leads without a domain stay "not_checked"
         const shortlist = rankLeads(leads, req.body).slice(0, Math.max(limit, SHORTLIST_SIZE));
