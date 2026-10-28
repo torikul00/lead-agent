@@ -56,6 +56,13 @@ const KIND_CONFIG = {
       errorHint: "Only image files are allowed.",
       perBatch: true,
    },
+   emailImage: {
+      subdir: "email-images",
+      filenamePrefix: "email-image-",
+      maxBytes: 5 * 1024 * 1024,
+      mimeTypes: ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"],
+      errorHint: "Only JPG, PNG, WEBP, or GIF images are allowed.",
+   },
 };
 
 function makeMimeFilter(mimeTypes, errorHint) {
@@ -90,7 +97,7 @@ function resolveBatchId(req) {
  *   - `url`      — the public R2 URL to store on the document
  *
  * @param {Object} opts
- * @param {'avatar'|'instructor'|'course'|'review'|'resource'|'exam'} opts.kind
+ * @param {'avatar'|'instructor'|'course'|'review'|'resource'|'exam'|'emailImage'} opts.kind
  * @param {string} [opts.fieldName] — default: `avatar` | `image` (course) | `file` (resource) | `avatar` (others)
  * @returns {import('express').RequestHandler} a middleware with multer's own
  *          `(req, res, callback)` shape, so `withUploadErrorHandling` keeps working.
@@ -98,7 +105,7 @@ function resolveBatchId(req) {
 export function createFileUploadMiddleware({ kind, fieldName } = {}) {
    if (!kind || !KIND_CONFIG[kind]) {
       throw new Error(
-         "createFileUploadMiddleware({ kind }) requires kind: 'avatar' | 'instructor' | 'course' | 'review' | 'resource' | 'exam'"
+         "createFileUploadMiddleware({ kind }) requires kind: 'avatar' | 'instructor' | 'course' | 'review' | 'resource' | 'exam' | 'emailImage'"
       );
    }
    const cfg = KIND_CONFIG[kind];

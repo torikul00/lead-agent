@@ -1,8 +1,9 @@
 import { Router } from 'express';
 const router = Router();
-import { createTemplate, deleteTemplate, getTemplate, getTemplates, updateTemplate } from '../controllers/email.controller.js';
+import { createTemplate, deleteTemplate, getTemplate, getTemplates, updateTemplate, uploadTemplateImage } from '../controllers/email.controller.js';
 import { emailTemplateSchema } from '../validation/email.validation.js';
 import authMiddleware from '../../middlewares/authMiddleware.js';
+import { createFileUploadMiddleware, withUploadErrorHandling } from '../../middlewares/fileUpload.middleware.js';
 import validate from '../../middlewares/validate.middleware.js';
 
 
@@ -10,6 +11,7 @@ router.use(authMiddleware);
 
 router.get('/templates', getTemplates);
 router.get('/templates/:id', getTemplate);
+router.post('/templates/images', withUploadErrorHandling(createFileUploadMiddleware({ kind: 'emailImage', fieldName: 'image' })), uploadTemplateImage);
 router.post('/templates', validate(emailTemplateSchema), createTemplate);
 router.patch('/templates/:id', validate(emailTemplateSchema), updateTemplate);
 router.delete('/templates/:id', deleteTemplate);

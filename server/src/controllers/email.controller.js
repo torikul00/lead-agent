@@ -1,6 +1,15 @@
 import { isValidObjectId } from 'mongoose';
 import EmailTemplate from '../models/emailTemplate.model.js';
 
+// POST /api/emails/templates/images — upload an image for use in an email body
+export const uploadTemplateImage = async (req, res) => {
+    if (!req.file?.url) {
+        return res.status(400).json({ error: 'Choose an image to upload.' });
+    }
+
+    return res.status(201).json({ url: req.file.url });
+};
+
 // Only what the client needs for a template
 const formatTemplate = (template) => ({
     id: template._id,

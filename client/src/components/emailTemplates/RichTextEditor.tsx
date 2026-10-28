@@ -1,9 +1,13 @@
+import { useRef, useState, type ChangeEvent } from 'react'
 import { EditorContent, Extension, useEditor, type Editor } from '@tiptap/react'
+import Image from '@tiptap/extension-image'
 import StarterKit from '@tiptap/starter-kit'
 import { Plugin } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
-import { Bold, Italic, Link2, List, ListOrdered, Underline, type LucideIcon } from 'lucide-react'
+import { Bold, ImagePlus, Italic, Link2, List, ListOrdered, LoaderCircle, Underline, type LucideIcon } from 'lucide-react'
 import { TEMPLATE_PLACEHOLDERS } from '@/constants/emails.ts'
+import api from '@/lib/axios.ts'
+import getErrorMessage from '@/lib/getErrorMessage.ts'
 
 type ToolbarButtonProps = {
     label: string
@@ -60,8 +64,11 @@ type RichTextEditorProps = {
 }
 
 export default function RichTextEditor({ value, onChange }: RichTextEditorProps) {
+    const fileInputRef = useRef<HTMLInputElement>(null)
+    const [uploading, setUploading] = useState(false)
+    const [uploadError, setUploadError] = useState('')
     const editor = useEditor({
-        extensions: [StarterKit.configure({ heading: false, blockquote: false, code: false, codeBlock: false, horizontalRule: false, link: { openOnClick: false } }), PlaceholderHighlight],
+        extensions: [StarterKit.configure({ heading: false, blockquote: false, code: false, codeBlock: false, horizontalRule: false, link: { openOnClick: false } }), Image.configure({ inline: false, allowBase64: false }), PlaceholderHighlight],
         content: value,
         // Re-render on every change so the toolbar shows the formatting under the cursor
         shouldRerenderOnTransaction: true,
@@ -71,6 +78,28 @@ export default function RichTextEditor({ value, onChange }: RichTextEditorProps)
     })
 
     if (!editor) return null
+
+    const uploadImage = async (file: File) => {
+        setUploadError('')
+        setUploading(true)
+        const formData = new FormData()
+        formData.append('image', file)
+
+        try {
+            const { data } = await api.post<{ url: string }>('/emails/templates/images', formData)
+            editor.chain().focus().setImage({ src: data.url, alt: file.name }).run()
+        } catch (err) {
+            setUploadError(getErrorMessage(err))
+        } finally {
+            setUploading(false)
+            if (fileInputRef.current) fileInputRef.current.value = ''
+        }
+    }
+
+    const handleImageChange = (event: ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0]
+        if (file) void uploadImage(file)
+    }
 
     const tools = [
         { name: 'bold', label: 'Bold', icon: Bold, run: () => editor.chain().focus().toggleBold().run() },
@@ -90,6 +119,14 @@ export default function RichTextEditor({ value, onChange }: RichTextEditorProps)
 
                 <span className="mx-1 h-5 w-px bg-slate-200" />
 
+                <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={handleImageChange} />
+                <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading} title="Upload image" aria-label="Upload image" className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 disabled:cursor-wait disabled:opacity-60">
+                    {uploading ? <LoaderCircle className="size-4 animate-spin" /> : <ImagePlus className="size-4" />}
+                    {uploading ? 'Uploading...' : 'Image'}
+                </button>
+
+                <span className="mx-1 h-5 w-px bg-slate-200" />
+
                 {TEMPLATE_PLACEHOLDERS.map((placeholder) => (
                     <button key={placeholder} type="button" onClick={() => editor.chain().focus().insertContent(`{{${placeholder}}}`).run()} title="Insert placeholder" className="cursor-pointer rounded-md bg-slate-100 px-2 py-1 font-mono text-xs text-slate-600 transition hover:bg-primary/10 hover:text-primary">
                         {`{{${placeholder}}}`}
@@ -98,6 +135,7 @@ export default function RichTextEditor({ value, onChange }: RichTextEditorProps)
             </div>
 
             <EditorContent editor={editor} />
+            {uploadError && <p role="alert" className="border-t border-red-100 bg-red-50 px-4 py-2 text-xs text-red-700">{uploadError}</p>}
         </div>
     )
 }
