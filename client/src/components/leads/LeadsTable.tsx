@@ -1,8 +1,9 @@
 import { Fragment, useState } from 'react'
 import { Check, Copy, ExternalLink, LoaderCircle, Mail, Phone } from 'lucide-react'
+import Select from 'react-select'
 import api from '@/lib/axios.ts'
 import getErrorMessage from '@/lib/getErrorMessage.ts'
-import type { Contact, FitLabel, Lead, MxStatus } from '@/types/index.ts'
+import type { Category, Contact, FitLabel, Lead, MxStatus } from '@/types/index.ts'
 
 const FIT_LABELS: Record<FitLabel, { label: string; className: string }> = {
     good_fit: { label: 'Good fit', className: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20' },
@@ -21,6 +22,23 @@ const SCORE_BARS: Record<FitLabel, string> = {
     good_fit: 'bg-emerald-500',
     needs_review: 'bg-amber-400',
     poor_fit: 'bg-slate-400',
+}
+
+type CategoryOption = {
+    value: string
+    label: string
+    color: string
+}
+
+const categorySelectClassNames = {
+    control: ({ isFocused }: { isFocused: boolean }) => `min-h-9 min-w-40 cursor-pointer rounded-lg border bg-white px-2 text-xs transition ${isFocused ? 'border-primary ring-4 ring-primary/15' : 'border-slate-200 hover:border-slate-300'}`,
+    valueContainer: () => 'px-1',
+    singleValue: () => 'text-slate-700',
+    input: () => 'text-slate-700',
+    indicatorsContainer: () => 'text-slate-400',
+    dropdownIndicator: () => 'p-1',
+    menu: () => 'z-30 mt-1 overflow-hidden rounded-lg border border-slate-200 bg-white p-1 shadow-lg',
+    option: ({ isSelected, isFocused }: { isSelected: boolean; isFocused: boolean }) => `cursor-pointer rounded-md px-2 py-1.5 text-xs ${isSelected ? 'bg-primary/10 font-medium text-primary' : isFocused ? 'bg-slate-100 text-slate-900' : 'text-slate-700'}`,
 }
 
 function CopyButton({ text }: { text: string }) {
@@ -125,9 +143,11 @@ type LeadsTableProps = {
     selected?: string[]
     onSelectedChange?: (selected: string[]) => void
     onLeadUpdate?: (lead: Lead) => void
+    categories?: Category[]
+    onCategoryChange?: (lead: Lead, categoryId: string | null) => Promise<void>
 }
 
-export default function LeadsTable({ leads, selected = [], onSelectedChange, onLeadUpdate }: LeadsTableProps) {
+export default function LeadsTable({ leads, selected = [], onSelectedChange, onLeadUpdate, categories = [], onCategoryChange }: LeadsTableProps) {
     const [openRow, setOpenRow] = useState<string | null>(null)
     const allSelected = leads.length > 0 && selected.length === leads.length
 
@@ -153,6 +173,7 @@ export default function LeadsTable({ leads, selected = [], onSelectedChange, onL
                             </th>
                         )}
                         <th className={`py-3 ${onSelectedChange ? 'px-4' : 'px-6'}`}>Company</th>
+                        {onCategoryChange && <th className="px-4 py-3">Category</th>}
                         <th className="px-4 py-3">Industry</th>
                         <th className="px-4 py-3">Employees</th>
                         <th className="px-4 py-3">Location</th>
@@ -171,6 +192,12 @@ export default function LeadsTable({ leads, selected = [], onSelectedChange, onL
                         const [firstContact] = lead.contacts
                         const emailCount = lead.company_emails.length + lead.contacts.filter((contact) => contact.email).length
                         const toggle = () => setOpenRow(open ? null : key)
+                        const assignedCategory = typeof lead.category_id === 'object' && lead.category_id ? lead.category_id._id : lead.category_id
+                        const categoryOptions: CategoryOption[] = [
+                            { value: '', label: 'Uncategorized', color: '#94a3b8' },
+                            ...categories.map((category) => ({ value: category.id, label: category.name, color: category.color })),
+                        ]
+                        const selectedCategory = categoryOptions.find((category) => category.value === (assignedCategory ?? '')) ?? categoryOptions[0]
 
                         return (
                             <Fragment key={key}>
@@ -219,6 +246,26 @@ export default function LeadsTable({ leads, selected = [], onSelectedChange, onL
                                             </div>
                                         </div>
                                     </td>
+                                    {onCategoryChange && (
+                                        <td className="px-4 py-4" onClick={(event) => event.stopPropagation()}>
+                                            <Select<CategoryOption>
+                                                unstyled
+                                                options={categoryOptions}
+                                                value={selectedCategory}
+                                                onChange={(option) => void onCategoryChange(lead, option?.value || null)}
+                                                isSearchable={false}
+                                                menuPlacement="auto"
+                                                classNames={categorySelectClassNames}
+                                                formatOptionLabel={(option) => (
+                                                    <span className="flex items-center gap-2">
+                                                        <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: option.color }} />
+                                                        {option.label}
+                                                    </span>
+                                                )}
+                                                aria-label={`Category for ${lead.name}`}
+                                            />
+                                        </td>
+                                    )}
                                     <td className="px-4 py-4">
                                         <p className="max-w-50 truncate text-slate-600 capitalize" title={lead.industry ?? undefined}>{lead.industry ?? '—'}</p>
                                     </td>
@@ -264,7 +311,7 @@ export default function LeadsTable({ leads, selected = [], onSelectedChange, onL
 
                                 {open && (
                                     <tr className="bg-slate-50/80">
-                                        <td colSpan={onSelectedChange ? 8 : 7} className="px-6 pb-4">
+                                        <td colSpan={(onSelectedChange ? 8 : 7) + (onCategoryChange ? 1 : 0)} className="px-6 pb-4">
                                             <div className="grid grid-cols-[1fr_2fr_1fr] gap-6 rounded-xl border border-slate-200 bg-white p-4">
                                                 <div>
                                                     <h3 className="text-xs font-medium tracking-wide text-slate-500 uppercase">About</h3>

@@ -36,6 +36,7 @@ export type CompanyEmail = {
 }
 
 export type Lead = {
+    id?: string
     name: string
     website: string
     domain: string | null
@@ -54,6 +55,7 @@ export type Lead = {
     score: number
     fit_label: FitLabel
     score_reasons: string[]
+    category_id?: string | null | { _id: string; name: string; color: string }
 }
 
 export type LeadList = {

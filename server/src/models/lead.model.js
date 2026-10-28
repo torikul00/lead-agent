@@ -29,6 +29,11 @@ const leadSchema = new Schema({
         ref: 'LeadList',
         required: true,
     },
+    category_id: {
+        type: Schema.Types.ObjectId,
+        ref: 'Category',
+        default: null,
+    },
     name: {
         type: String,
         required: true,

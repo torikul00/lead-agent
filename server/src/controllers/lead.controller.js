@@ -2,6 +2,7 @@ import { isValidObjectId } from 'mongoose';
 import DomainMxRecord from '../models/domainMxRecord.model.js';
 import Lead from '../models/lead.model.js';
 import LeadList from '../models/leadList.model.js';
+import Category from '../models/category.model.js';
 import { SOURCES } from '../sources/index.js';
 import { ENRICHERS } from '../enrichers/index.js';
 import hunter from '../enrichers/hunter.enricher.js';
@@ -130,7 +131,7 @@ export const saveLeadList = async (req, res) => {
 
         // Remove the list again if its leads can't be saved, so no empty list is left behind
         try {
-            await Lead.insertMany(leads.map((lead) => ({ ...lead, user_id: req.user._id, lead_list_id: list._id })));
+            await Lead.insertMany(leads.map((lead) => ({ ...lead, user_id: req.user._id, lead_list_id: list._id, category_id: null })));
         } catch (err) {
             await LeadList.deleteOne({ _id: list._id });
             throw err;
@@ -162,10 +163,34 @@ export const getLeadList = async (req, res) => {
             return res.status(404).json({ error: 'List not found.' });
         }
 
-        const leads = await Lead.find({ lead_list_id: list._id }).sort({ score: -1, _id: 1 }).select('-user_id -lead_list_id -__v').lean();
-        return res.status(200).json({ list: formatLeadList(list), leads });
+        const leads = await Lead.find({ lead_list_id: list._id }).sort({ score: -1, _id: 1 }).populate('category_id', 'name color').select('-user_id -lead_list_id -__v').lean();
+        const formattedLeads = leads.map((lead) => ({ ...lead, id: lead._id }));
+        return res.status(200).json({ list: formatLeadList(list), leads: formattedLeads });
     } catch (err) {
         console.error('Loading lead list failed:', err);
         return res.status(500).json({ error: 'Could not load this list right now. Please try again.' });
+    }
+};
+
+// PATCH /api/leads/:id/category — assign or clear a lead's category
+export const updateLeadCategory = async (req, res) => {
+    try {
+        const { category_id: categoryId } = req.body;
+        if (categoryId) {
+            const category = await Category.exists({ _id: categoryId, user_id: req.user._id });
+            if (!category) return res.status(404).json({ error: 'Category not found.' });
+        }
+
+        const lead = await Lead.findOneAndUpdate(
+            { _id: req.params.id, user_id: req.user._id },
+            { category_id: categoryId },
+            { new: true }
+        ).populate('category_id', 'name color').lean();
+
+        if (!lead) return res.status(404).json({ error: 'Lead not found.' });
+        return res.status(200).json({ lead: { id: lead._id, category_id: lead.category_id } });
+    } catch (err) {
+        console.error('Updating lead category failed:', err);
+        return res.status(500).json({ error: 'Could not update the lead category right now. Please try again.' });
     }
 };
