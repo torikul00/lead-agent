@@ -63,6 +63,14 @@ export type LeadList = {
     created_at: string
 }
 
+export type Category = {
+    id: string
+    name: string
+    slug: string
+    color: string
+    created_at: string
+}
+
 export type TemplateVariantKey = 'google_workspace' | 'microsoft_365' | 'zoho' | 'godaddy' | 'hostinger' | 'titan' | 'ionos' | 'namecheap' | 'other'
 
 export type EmailContent = {
