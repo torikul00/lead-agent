@@ -11,6 +11,7 @@ import EmailTemplateForm from '@/pages/EmailTemplateForm.tsx'
 import Login from '@/pages/Login.tsx'
 import Signup from '@/pages/Signup.tsx'
 import Categories from '@/pages/Categories.tsx'
+import Settings from '@/pages/Settings.tsx'
 
 export default function AppRouter() {
     return (
@@ -27,6 +28,7 @@ export default function AppRouter() {
                         <Route path="/email-templates/:id/edit" element={<EmailTemplateForm />} />
                         <Route path="/categories" element={<Categories />} />
                         <Route path="/profile" element={<Profile />} />
+                        <Route path="/settings" element={<Settings />} />
                     </Route>
                 </Route>
 

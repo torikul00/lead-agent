@@ -1,5 +1,4 @@
-import { isValidObjectId } from 'mongoose';
-import DomainMxRecord from '../models/domainMxRecord.model.js';
+﻿import { isValidObjectId } from 'mongoose';
 import Lead from '../models/lead.model.js';
 import LeadList from '../models/leadList.model.js';
 import Category from '../models/category.model.js';
@@ -8,9 +7,9 @@ import { ENRICHERS } from '../enrichers/index.js';
 import hunter from '../enrichers/hunter.enricher.js';
 import { searchCities } from '../sources/geoapify.source.js';
 import { SHORTLIST_SIZE } from '../../utils/constants.js';
-import { countEmails, dedupeLeads, normalizeDomain, rankLeads } from '../../utils/helper.js';
+import { checkMx, countEmails, dedupeLeads, normalizeDomain, rankLeads } from '../../utils/helper.js';
 
-// POST /api/leads/generate_leads — find companies from the selected sources and return the top matches with their decision makers.
+// POST /api/leads/generate_leads â€” find companies from the selected sources and return the top matches with their decision makers.
 export const generateLeads = async (req, res) => {
     try {
         const { sources, limit } = req.body;
@@ -58,7 +57,7 @@ export const generateLeads = async (req, res) => {
         const shortlist = rankLeads(leads, req.body).slice(0, Math.max(limit, SHORTLIST_SIZE));
         await Promise.all(shortlist.map(async (lead) => {
             if (!lead.domain) return;
-            const mx = await DomainMxRecord.getMx(lead.domain);
+            const mx = await checkMx(lead.domain);
             lead.mx_status = mx.mx_status;
             lead.email_provider = mx.email_provider;
         }));
@@ -84,7 +83,7 @@ export const generateLeads = async (req, res) => {
     }
 };
 
-// POST /api/leads/find_cities — city suggestions for the search form while the user types
+// POST /api/leads/find_cities â€” city suggestions for the search form while the user types
 export const findCities = async (req, res) => {
     try {
         const cities = await searchCities(req.body.country, req.body.text);
@@ -96,7 +95,7 @@ export const findCities = async (req, res) => {
     }
 };
 
-// POST /api/leads/find_emails — look up one company's decision makers on Hunter; it spends Hunter credits, so it only runs when asked
+// POST /api/leads/find_emails â€” look up one company's decision makers on Hunter; it spends Hunter credits, so it only runs when asked
 export const findEmails = async (req, res) => {
     try {
         const lead = req.body;
@@ -123,7 +122,7 @@ const formatLeadList = (list) => ({
     created_at: list.createdAt,
 });
 
-// POST /api/leads/save_list — save the chosen leads as a named list, along with the search that found them
+// POST /api/leads/save_list â€” save the chosen leads as a named list, along with the search that found them
 export const saveLeadList = async (req, res) => {
     try {
         const { name, search_query, searched_at, leads } = req.body;
@@ -144,7 +143,7 @@ export const saveLeadList = async (req, res) => {
     }
 };
 
-// GET /api/leads/lists — the user's saved lists, newest first
+// GET /api/leads/lists â€” the user's saved lists, newest first
 export const getLeadLists = async (req, res) => {
     try {
         const lists = await LeadList.find({ user_id: req.user._id }).sort({ createdAt: -1 }).lean();
@@ -155,7 +154,21 @@ export const getLeadLists = async (req, res) => {
     }
 };
 
-// GET /api/leads/lists/:id — one of the user's lists with its leads, best score first
+// DELETE /api/leads/lists/:id â€” remove a list and all its leads
+export const deleteLeadList = async (req, res) => {
+    try {
+        const list = isValidObjectId(req.params.id) && await LeadList.findOneAndDelete({ _id: req.params.id, user_id: req.user._id }).lean();
+        if (!list) return res.status(404).json({ error: 'List not found.' });
+
+        await Lead.deleteMany({ lead_list_id: list._id });
+        return res.status(200).json({ message: 'List deleted.' });
+    } catch (err) {
+        console.error('Deleting lead list failed:', err);
+        return res.status(500).json({ error: 'Could not delete the list right now. Please try again.' });
+    }
+};
+
+// GET /api/leads/lists/:id â€” one of the user's lists with its leads, best score first
 export const getLeadList = async (req, res) => {
     try {
         const list = isValidObjectId(req.params.id) && await LeadList.findOne({ _id: req.params.id, user_id: req.user._id }).lean();
@@ -172,7 +185,7 @@ export const getLeadList = async (req, res) => {
     }
 };
 
-// PATCH /api/leads/:id/category — assign or clear a lead's category
+// PATCH /api/leads/:id/category â€” assign or clear a lead's category
 export const updateLeadCategory = async (req, res) => {
     try {
         const { category_id: categoryId } = req.body;

@@ -1,4 +1,4 @@
-import { Resolver } from 'dns/promises';
+﻿import { Resolver } from 'dns/promises';
 import { MAX_COMPANY_EMAILS, MAX_CONTACTS } from './constants.js';
 
 const resolver = new Resolver({ timeout: 3000, tries: 1 });
@@ -35,7 +35,7 @@ export const isValidEmail = (email) => /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/
 
 const normalizeName = (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
-// "José García" -> "jose garcia", so the same person from two sources matches
+// "JosÃ© GarcÃ­a" -> "jose garcia", so the same person from two sources matches
 export const normalizePersonName = (name) => normalizeName(name.normalize('NFD').replace(/\p{M}/gu, ''));
 
 // One lead per company: by domain, or by name + country when there's no domain
@@ -65,13 +65,16 @@ const EMAIL_PROVIDERS = [
     ['Hostinger', /(^|\.)hostinger\.com$/],
     ['Namecheap', /(^|\.)privateemail\.com$/],
     ['Rackspace', /(^|\.)emailsrvr\.com$/],
+    ['One.com', /(^|\.)one\.com$/],
 ];
 
-// ["aspmx.l.google.com", ...] -> "Google Workspace"; a mail host on the company's own domain is "Self-hosted"
+// ["aspmx.l.google.com", ...] -> "Google Workspace"; a mail host on the company's own domain is "Self-hosted";
+// when no provider is recognised, fall back to the primary MX host so it can still be identified
 const detectEmailProvider = (hosts, domain) => {
     const provider = EMAIL_PROVIDERS.find(([, pattern]) => hosts.some((host) => pattern.test(host)));
     if (provider) return provider[0];
-    return hosts.some((host) => host === domain || host.endsWith(`.${domain}`)) ? 'Self-hosted' : 'Other';
+    if (hosts.some((host) => host === domain || host.endsWith(`.${domain}`))) return 'Self-hosted';
+    return hosts[0] ?? 'Unknown';
 };
 
 // MX records only show the domain can receive mail, not that any address exists
@@ -107,7 +110,7 @@ const ROLES = [
     ['Founder', /founder|\bfounding partner\b/i],
     ['Owner', /(?<!product )\bowner\b/i],
     ['President', /(?<!vice[ -])\bpresident\b/i],
-    ['Managing Director', /\bmanaging director\b|gesch(ä|ae)ftsf(ü|ue)hrer/i],
+    ['Managing Director', /\bmanaging director\b|gesch(Ã¤|ae)ftsf(Ã¼|ue)hrer/i],
     ['CTO', /\b(cto|chief technology|chief technical)\b/i],
     ['CFO', /\b(cfo|chief financial)\b/i],
     ['COO', /\b(coo|chief operating)\b/i],

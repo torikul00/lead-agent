@@ -1,15 +1,18 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
-import { Eye, List, LoaderCircle, Send } from 'lucide-react'
+import { Eye, List, LoaderCircle, Send, Trash2 } from 'lucide-react'
 import api from '@/lib/axios.ts'
 import getErrorMessage from '@/lib/getErrorMessage.ts'
 import FormAlert from '@/components/FormAlert.tsx'
+import ConfirmationModal from '@/components/ConfirmationModal.tsx'
 import type { LeadList } from '@/types/index.ts'
 
 export default function LeadLists() {
     const [lists, setLists] = useState<LeadList[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
+    const [deletingList, setDeletingList] = useState<LeadList | null>(null)
+    const [deleteLoading, setDeleteLoading] = useState(false)
 
     useEffect(() => {
         api.get('/leads/lists')
@@ -17,6 +20,21 @@ export default function LeadLists() {
             .catch((err) => setError(getErrorMessage(err)))
             .finally(() => setLoading(false))
     }, [])
+
+    const handleDelete = async () => {
+        if (!deletingList) return
+        setDeleteLoading(true)
+        try {
+            await api.delete(`/leads/lists/${deletingList.id}`)
+            setLists((prev) => prev.filter((l) => l.id !== deletingList.id))
+            setDeletingList(null)
+        } catch (err) {
+            setError(getErrorMessage(err))
+            setDeletingList(null)
+        } finally {
+            setDeleteLoading(false)
+        }
+    }
 
     return (
         <div className="space-y-6">
@@ -72,6 +90,14 @@ export default function LeadLists() {
                                                     <Send className="size-3.5" />
                                                     Send email
                                                 </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setDeletingList(list)}
+                                                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-red-500 transition hover:border-red-200 hover:bg-red-50"
+                                                >
+                                                    <Trash2 className="size-3.5" />
+                                                    Delete
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>
@@ -80,6 +106,17 @@ export default function LeadLists() {
                         </table>
                     </div>
                 </section>
+            )}
+
+            {deletingList && (
+                <ConfirmationModal
+                    title="Delete list"
+                    message={`Are you sure you want to delete "${deletingList.name}"? This will permanently remove the list and all its leads.`}
+                    confirmLabel="Delete list"
+                    loading={deleteLoading}
+                    onConfirm={handleDelete}
+                    onClose={() => setDeletingList(null)}
+                />
             )}
         </div>
     )

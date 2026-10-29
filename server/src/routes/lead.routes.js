@@ -1,6 +1,6 @@
 import { Router } from 'express';
 const router = Router();
-import { findCities, findEmails, generateLeads, getLeadList, getLeadLists, saveLeadList, updateLeadCategory } from '../controllers/lead.controller.js';
+import { findCities, findEmails, generateLeads, getLeadList, getLeadLists, saveLeadList, updateLeadCategory, deleteLeadList } from '../controllers/lead.controller.js';
 import { findCitiesSchema, findEmailsSchema, generateLeadsSchema, saveLeadListSchema } from '../validation/lead.validation.js';
 import { updateLeadCategorySchema } from '../validation/categoryAssignment.validation.js';
 import authMiddleware from '../../middlewares/authMiddleware.js';
@@ -15,6 +15,7 @@ router.post('/find_cities', validate(findCitiesSchema), findCities);
 router.post('/save_list', validate(saveLeadListSchema), saveLeadList);
 router.get('/lists', getLeadLists);
 router.get('/lists/:id', getLeadList);
+router.delete('/lists/:id', deleteLeadList);
 router.patch('/:id/category', validate(updateLeadCategorySchema), updateLeadCategory);
 
 
