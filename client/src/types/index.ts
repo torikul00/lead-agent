@@ -32,7 +32,8 @@ export type Contact = {
 export type CompanyEmail = {
     email: string
     source_name: string
-    source_url: string
+    // Null for emails added by hand
+    source_url: string | null
 }
 
 export type Lead = {

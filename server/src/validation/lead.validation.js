@@ -86,6 +86,11 @@ const savedLeadSchema = z.object({
     score_reasons: z.array(z.string().trim().max(500)).max(20).default([]),
 });
 
+// A company email typed in by hand on a saved lead
+export const addCompanyEmailSchema = z.object({
+    email: z.string().trim().toLowerCase().min(1, 'Email is required').pipe(z.email('Enter a valid email address')),
+});
+
 export const saveLeadListSchema = z.object({
     name: z.string().trim().min(1, 'List name is required').max(100, 'List name must be 100 characters or less'),
     search_query: generateLeadsSchema,

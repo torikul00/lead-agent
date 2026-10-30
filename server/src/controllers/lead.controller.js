@@ -6,7 +6,7 @@ import { SOURCES } from '../sources/index.js';
 import { ENRICHERS } from '../enrichers/index.js';
 import hunter from '../enrichers/hunter.enricher.js';
 import { searchCities } from '../sources/geoapify.source.js';
-import { SHORTLIST_SIZE } from '../../utils/constants.js';
+import { MAX_COMPANY_EMAILS, SHORTLIST_SIZE } from '../../utils/constants.js';
 import { checkMx, countEmails, dedupeLeads, normalizeDomain, rankLeads } from '../../utils/helper.js';
 
 // POST /api/leads/generate_leads â€” find companies from the selected sources and return the top matches with their decision makers.
@@ -205,5 +205,29 @@ export const updateLeadCategory = async (req, res) => {
     } catch (err) {
         console.error('Updating lead category failed:', err);
         return res.status(500).json({ error: 'Could not update the lead category right now. Please try again.' });
+    }
+};
+
+// POST /api/leads/:id/company_emails — add a company email by hand; its source is "Manual"
+export const addManualCompanyEmail = async (req, res) => {
+    try {
+        const lead = isValidObjectId(req.params.id) && await Lead.findOne({ _id: req.params.id, user_id: req.user._id });
+        if (!lead) return res.status(404).json({ error: 'Lead not found.' });
+
+        const { email } = req.body;
+        const isSaved = lead.company_emails.some((item) => item.email.toLowerCase() === email) || lead.contacts.some((contact) => contact.email?.toLowerCase() === email);
+        if (isSaved) {
+            return res.status(409).json({ error: 'This email is already saved for this lead.' });
+        }
+        if (lead.company_emails.length >= MAX_COMPANY_EMAILS) {
+            return res.status(400).json({ error: `A lead can have up to ${MAX_COMPANY_EMAILS} company emails.` });
+        }
+
+        lead.company_emails.push({ email, source_name: 'Manual', source_url: null });
+        await lead.save();
+        return res.status(201).json({ company_emails: lead.company_emails });
+    } catch (err) {
+        console.error('Adding company email failed:', err);
+        return res.status(500).json({ error: 'Could not add the email right now. Please try again.' });
     }
 };

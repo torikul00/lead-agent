@@ -1,28 +1,10 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useState, type SyntheticEvent } from 'react'
 import { Check, Copy, ExternalLink, LoaderCircle, Mail, MailCheck, Phone, Send } from 'lucide-react'
 import Select from 'react-select'
 import api from '@/lib/axios.ts'
 import getErrorMessage from '@/lib/getErrorMessage.ts'
-import type { Category, Contact, FitLabel, Lead, MxStatus } from '@/types/index.ts'
-
-const FIT_LABELS: Record<FitLabel, { label: string; className: string }> = {
-    good_fit: { label: 'Good fit', className: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20' },
-    needs_review: { label: 'Needs review', className: 'bg-amber-50 text-amber-700 ring-amber-600/20' },
-    poor_fit: { label: 'Poor fit', className: 'bg-slate-100 text-slate-600 ring-slate-500/20' },
-}
-
-const MX_LABELS: Record<MxStatus, { label: string; dot: string }> = {
-    found: { label: 'MX found', dot: 'bg-emerald-500' },
-    not_found: { label: 'No MX', dot: 'bg-red-500' },
-    error: { label: 'Check failed', dot: 'bg-amber-500' },
-    not_checked: { label: 'Not checked', dot: 'bg-slate-300' },
-}
-
-const SCORE_BARS: Record<FitLabel, string> = {
-    good_fit: 'bg-emerald-500',
-    needs_review: 'bg-amber-400',
-    poor_fit: 'bg-slate-400',
-}
+import { FIT_LABELS, MX_LABELS, SCORE_BARS } from '@/constants/leads.ts'
+import type { Category, Contact, Lead } from '@/types/index.ts'
 
 type CategoryOption = {
     value: string
@@ -58,7 +40,7 @@ function CopyButton({ text }: { text: string }) {
     )
 }
 
-function EmailLink({ email }: { email: string }) {
+export function EmailLink({ email }: { email: string }) {
     return (
         <span className="inline-flex min-w-0 items-center gap-0.5">
             <a href={`mailto:${email}`} className="truncate text-sm text-primary hover:underline">{email}</a>
@@ -67,8 +49,10 @@ function EmailLink({ email }: { email: string }) {
     )
 }
 
-// Icon link to where an item was found; the source name shows on hover
-function SourceLink({ name, url }: { name: string; url: string }) {
+// Icon link to where an item was found; the source name shows on hover. Items added by hand have no page, so their source shows as text
+export function SourceLink({ name, url }: { name: string; url: string | null }) {
+    if (!url) return <span className="shrink-0 text-xs text-slate-400">{name}</span>
+
     return (
         <a href={url} target="_blank" rel="noopener noreferrer" title={`Found on ${name}`} aria-label={`Found on ${name}`} className="shrink-0 text-slate-300 transition hover:text-primary">
             <ExternalLink className="size-3.5" />
@@ -76,7 +60,7 @@ function SourceLink({ name, url }: { name: string; url: string }) {
     )
 }
 
-function ContactItem({ contact }: { contact: Contact }) {
+export function ContactItem({ contact }: { contact: Contact }) {
     return (
         <li className="min-w-0 rounded-lg border border-slate-200 px-3 py-2">
             <div className="flex items-center justify-between gap-2">
@@ -146,9 +130,10 @@ type LeadsTableProps = {
     categories?: Category[]
     onCategoryChange?: (lead: Lead, categoryId: string | null) => Promise<void>
     onSendEmail?: (lead: Lead) => void
+    onOpenLead?: (lead: Lead) => void
 }
 
-export default function LeadsTable({ leads, selected = [], onSelectedChange, onLeadUpdate, categories = [], onCategoryChange, onSendEmail }: LeadsTableProps) {
+export default function LeadsTable({ leads, selected = [], onSelectedChange, onLeadUpdate, categories = [], onCategoryChange, onSendEmail, onOpenLead }: LeadsTableProps) {
     const [openRow, setOpenRow] = useState<string | null>(null)
     const allSelected = leads.length > 0 && selected.length === leads.length
 
@@ -201,6 +186,22 @@ export default function LeadsTable({ leads, selected = [], onSelectedChange, onL
                         ]
                         const selectedCategory = categoryOptions.find((category) => category.value === (assignedCategory ?? '')) ?? categoryOptions[0]
 
+                        // The logo and name open the lead's details, without also expanding the row
+                        const openDetails = (event: SyntheticEvent) => {
+                            event.stopPropagation()
+                            onOpenLead?.(lead)
+                        }
+
+                        const logo = lead.domain ? (
+                            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white">
+                                <img src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(lead.domain)}&sz=128`} alt={`${lead.name} favicon`} width={32} height={32} className="rounded" />
+                            </div>
+                        ) : (
+                            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 font-semibold text-primary">
+                                {lead.name.charAt(0).toUpperCase()}
+                            </div>
+                        )
+
                         return (
                             <Fragment key={key}>
                                 {/* The whole row opens the details; Enter or Space does the same for keyboard users */}
@@ -228,17 +229,19 @@ export default function LeadsTable({ leads, selected = [], onSelectedChange, onL
                                     )}
                                     <td className={`py-4 ${onSelectedChange ? 'px-4' : 'px-6'}`}>
                                         <div className="flex items-center gap-3">
-                                            {lead.domain ? (
-                                                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white">
-                                                    <img src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(lead.domain)}&sz=128`} alt={`${lead.name} favicon`} width={32} height={32} className="rounded" />
-                                                </div>
-                                            ) : (
-                                                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 font-semibold text-primary">
-                                                    {lead.name.charAt(0).toUpperCase()}
-                                                </div>
-                                            )}
+                                            {onOpenLead ? (
+                                                <button type="button" onClick={openDetails} aria-label={`View details of ${lead.name}`} className="shrink-0 cursor-pointer rounded-xl transition hover:opacity-80">
+                                                    {logo}
+                                                </button>
+                                            ) : logo}
                                             <div className="min-w-0">
-                                                <p className="truncate font-medium text-slate-900">{lead.name}</p>
+                                                {onOpenLead ? (
+                                                    <button type="button" onClick={openDetails} className="block max-w-full cursor-pointer truncate text-left font-medium text-slate-900 transition hover:text-primary">
+                                                        {lead.name}
+                                                    </button>
+                                                ) : (
+                                                    <p className="truncate font-medium text-slate-900">{lead.name}</p>
+                                                )}
                                                 {lead.domain && (
                                                     <a href={lead.website} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 text-xs text-slate-500 transition hover:text-primary">
                                                         {lead.domain}

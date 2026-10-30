@@ -7,6 +7,7 @@ import getErrorMessage from '@/lib/getErrorMessage.ts'
 import FormAlert from '@/components/FormAlert.tsx'
 import LeadsTable from '@/components/leads/LeadsTable.tsx'
 import SendEmailModal from '@/components/leads/SendEmailModal.tsx'
+import LeadDetailsModal from '@/components/leads/LeadDetailsModal.tsx'
 import type { Category, Lead, LeadList } from '@/types/index.ts'
 
 export default function LeadListDetails() {
@@ -19,6 +20,7 @@ export default function LeadListDetails() {
     const [search, setSearch] = useState('')
     const [categoryFilter, setCategoryFilter] = useState('')
     const [sendingTo, setSendingTo] = useState<Lead | null>(null)
+    const [viewingLead, setViewingLead] = useState<Lead | null>(null)
 
     useEffect(() => {
         Promise.all([api.get(`/leads/lists/${id}`), api.get('/categories')])
@@ -118,8 +120,20 @@ export default function LeadListDetails() {
                             }
                         }}
                         onSendEmail={setSendingTo}
+                        onOpenLead={setViewingLead}
                     />
                 </section>
+            )}
+
+            {viewingLead && (
+                <LeadDetailsModal
+                    lead={viewingLead}
+                    onClose={() => setViewingLead(null)}
+                    onLeadUpdate={(updated) => {
+                        setLeads((current) => current.map((item) => (item.id === updated.id ? updated : item)))
+                        setViewingLead(updated)
+                    }}
+                />
             )}
 
             {sendingTo && (
