@@ -13,3 +13,9 @@ export const TEMPLATE_VARIANTS = [
     { key: 'namecheap', label: 'Namecheap' },
     { key: 'other', label: 'Other' },
 ] as const
+
+// Mailboxes a user can connect in Settings to send lead emails from
+export const MAILBOX_PROVIDERS = [
+    { key: 'gmail', label: 'Gmail', description: 'Gmail and Google Workspace' },
+    { key: 'outlook', label: 'Outlook', description: 'Outlook.com and Microsoft 365' },
+] as const

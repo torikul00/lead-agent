@@ -1,13 +1,20 @@
 import { Router } from 'express';
 const router = Router();
 import { createTemplate, deleteTemplate, getTemplate, getTemplates, updateTemplate, uploadTemplateImage } from '../controllers/email.controller.js';
+import { connectMailbox, disconnectMailbox, getMailboxes, mailboxCallback } from '../controllers/mailbox.controller.js';
 import { emailTemplateSchema } from '../validation/email.validation.js';
 import authMiddleware from '../../middlewares/authMiddleware.js';
 import { createFileUploadMiddleware, withUploadErrorHandling } from '../../middlewares/fileUpload.middleware.js';
 import validate from '../../middlewares/validate.middleware.js';
 
+// Google and Microsoft redirect the browser here, so it's checked by its one-time state instead of the login cookie
+router.get('/mailboxes/:provider/callback', mailboxCallback);
 
 router.use(authMiddleware);
+
+router.get('/mailboxes', getMailboxes);
+router.get('/mailboxes/:provider/connect', connectMailbox);
+router.post('/mailboxes/:id/disconnect', disconnectMailbox);
 
 router.get('/templates', getTemplates);
 router.get('/templates/:id', getTemplate);

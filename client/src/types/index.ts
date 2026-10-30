@@ -87,6 +87,15 @@ export type EmailTemplate = EmailContent & {
     updated_at: string
 }
 
+export type MailboxProvider = 'gmail' | 'outlook'
+
+export type Mailbox = {
+    id: string
+    provider: MailboxProvider
+    email: string
+    status: 'connected' | 'disconnected'
+}
+
 export type AuthState = {
     user: User | null
     loading: boolean

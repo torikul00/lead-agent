@@ -1,4 +1,5 @@
 ﻿import { Resolver } from 'dns/promises';
+import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
 import { MAX_COMPANY_EMAILS, MAX_CONTACTS } from './constants.js';
 
 const resolver = new Resolver({ timeout: 3000, tries: 1 });
@@ -93,6 +94,26 @@ export const checkMx = async (domain) => {
         const mxStatus = ['ENOTFOUND', 'ENODATA'].includes(err.code) ? 'not_found' : 'error';
         return { mx_status: mxStatus, mx_records: [], email_provider: null };
     }
+};
+
+const encryptionKey = () => {
+    if (!process.env.MAILBOX_ENCRYPTION_KEY) throw new Error('MAILBOX_ENCRYPTION_KEY is not set');
+    return Buffer.from(process.env.MAILBOX_ENCRYPTION_KEY, 'hex');
+};
+
+// Mailbox tokens are saved encrypted with AES-256-GCM, as "iv:tag:data" in hex
+export const encrypt = (text) => {
+    const iv = randomBytes(12);
+    const cipher = createCipheriv('aes-256-gcm', encryptionKey(), iv);
+    const data = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()]);
+    return [iv, cipher.getAuthTag(), data].map((part) => part.toString('hex')).join(':');
+};
+
+export const decrypt = (value) => {
+    const [iv, tag, data] = value.split(':').map((part) => Buffer.from(part, 'hex'));
+    const decipher = createDecipheriv('aes-256-gcm', encryptionKey(), iv);
+    decipher.setAuthTag(tag);
+    return Buffer.concat([decipher.update(data), decipher.final()]).toString('utf8');
 };
 
 // Run fn for every item, at most `limit` at a time
