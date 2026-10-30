@@ -92,6 +92,22 @@ export const getConversation = async (req, res) => {
     }
 };
 
+// DELETE /api/emails/conversations/:id — remove a conversation and its emails from LeadAgent; the mailbox itself isn't touched
+export const deleteConversation = async (req, res) => {
+    try {
+        const conversation = isValidObjectId(req.params.id) && await Conversation.findOneAndDelete({ _id: req.params.id, user_id: req.user._id });
+        if (!conversation) {
+            return res.status(404).json({ error: 'Conversation not found.' });
+        }
+
+        await EmailMessage.deleteMany({ conversation_id: conversation._id });
+        return res.status(200).json({ message: 'Conversation deleted.' });
+    } catch (err) {
+        console.error('Deleting conversation failed:', err);
+        return res.status(500).json({ error: 'Could not delete the conversation right now. Please try again.' });
+    }
+};
+
 // POST /api/emails/check_replies — check the user's mailboxes now instead of waiting for the next automatic check
 export const checkReplies = async (req, res) => {
     try {

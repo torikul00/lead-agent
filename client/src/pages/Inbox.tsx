@@ -1,10 +1,11 @@
 import { useEffect, useEffectEvent, useRef, useState, type SubmitEvent, type SyntheticEvent } from 'react'
-import { LoaderCircle, Mail, Phone, RefreshCw, Send } from 'lucide-react'
+import { EllipsisVertical, LoaderCircle, Mail, Phone, RefreshCw, Send, Trash2 } from 'lucide-react'
 import api from '@/lib/axios.ts'
 import socket from '@/lib/socket.ts'
 import getErrorMessage from '@/lib/getErrorMessage.ts'
 import useInboxStore from '@/store/inbox.store.ts'
 import FormAlert from '@/components/FormAlert.tsx'
+import ConfirmationModal from '@/components/ConfirmationModal.tsx'
 import RichTextEditor from '@/components/emailTemplates/RichTextEditor.tsx'
 import CategorySelect from '@/components/categories/CategorySelect.tsx'
 import type { Category, Conversation, EmailMessage } from '@/types/index.ts'
@@ -89,6 +90,47 @@ function EmailBody({ html }: { html: string }) {
     )
 }
 
+// The ⋮ menu in the conversation header; for now it only has delete
+function ConversationMenu({ onDelete }: { onDelete: () => void }) {
+    const [open, setOpen] = useState(false)
+    const menuRef = useRef<HTMLDivElement>(null)
+
+    // Close the menu when clicking anywhere outside it
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+                setOpen(false)
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => document.removeEventListener('mousedown', handleClickOutside)
+    }, [])
+
+    return (
+        <div ref={menuRef} className="relative">
+            <button type="button" onClick={() => setOpen(!open)} aria-label="Conversation options" aria-expanded={open} className="cursor-pointer rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700">
+                <EllipsisVertical className="size-5" />
+            </button>
+
+            {open && (
+                <div className="absolute right-0 z-30 mt-2 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setOpen(false)
+                            onDelete()
+                        }}
+                        className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-red-600 transition hover:bg-red-50"
+                    >
+                        <Trash2 className="size-4" />
+                        Delete conversation
+                    </button>
+                </div>
+            )}
+        </div>
+    )
+}
+
 export default function Inbox() {
     const [conversations, setConversations] = useState<Conversation[]>([])
     const [categories, setCategories] = useState<Category[]>([])
@@ -103,6 +145,8 @@ export default function Inbox() {
     const [replyError, setReplyError] = useState('')
     // Counts sent replies; a new count clears the editor
     const [sentCount, setSentCount] = useState(0)
+    const [confirmDelete, setConfirmDelete] = useState(false)
+    const [deleteLoading, setDeleteLoading] = useState(false)
     // The conversation clicked last, so a slow answer for an earlier click is ignored
     const openedId = useRef<string | null>(null)
     const threadRef = useRef<HTMLDivElement>(null)
@@ -205,8 +249,31 @@ export default function Inbox() {
         try {
             await api.patch(`/leads/${leadId}/category`, { category_id: categoryId })
             setThread((current) => (current?.conversation.lead_id === leadId ? { ...current, conversation: { ...current.conversation, category_id: categoryId } } : current))
+            // Every conversation with this lead shows the new category tag
+            setConversations((current) => current.map((item) => (item.lead_id === leadId ? { ...item, category_id: categoryId } : item)))
         } catch (err) {
             setThreadError(getErrorMessage(err))
+        }
+    }
+
+    // Removed from LeadAgent only; the emails stay in the mailbox
+    const deleteConversation = async () => {
+        if (!thread) return
+        const conversationId = thread.conversation.id
+        setDeleteLoading(true)
+
+        try {
+            await api.delete(`/emails/conversations/${conversationId}`)
+            setConversations((current) => current.filter((item) => item.id !== conversationId))
+            openedId.current = null
+            setSelectedId(null)
+            setThread(null)
+            fetchUnreadCount()
+        } catch (err) {
+            setThreadError(getErrorMessage(err))
+        } finally {
+            setDeleteLoading(false)
+            setConfirmDelete(false)
         }
     }
 
@@ -284,28 +351,36 @@ export default function Inbox() {
                 )}
 
                 <ul className="flex-1 divide-y divide-slate-100 overflow-y-auto">
-                    {conversations.map((conversation) => (
-                        <li key={conversation.id}>
-                            <button
-                                type="button"
-                                onClick={() => openConversation(conversation.id)}
-                                className={`flex w-full cursor-pointer items-center gap-3 px-5 py-4 text-left transition hover:bg-slate-50 ${selectedId === conversation.id ? 'bg-primary/5' : ''}`}
-                            >
-                                <LeadAvatar name={conversation.lead_name} domain={conversation.domain} />
-                                <div className="min-w-0 flex-1">
-                                    <div className="flex items-center justify-between gap-2">
-                                        <span className={`truncate text-sm ${conversation.is_read ? 'font-medium text-slate-700' : 'font-semibold text-slate-900'}`}>
-                                            {conversation.lead_name}
-                                        </span>
-                                        <span className="shrink-0 text-xs text-slate-400">{formatListTime(conversation.last_message_at)}</span>
+                    {conversations.map((conversation) => {
+                        const category = categories.find((item) => item.id === conversation.category_id)
+                        return (
+                            <li key={conversation.id}>
+                                <button
+                                    type="button"
+                                    onClick={() => openConversation(conversation.id)}
+                                    className={`flex w-full cursor-pointer items-center gap-3 px-5 py-4 text-left transition hover:bg-slate-50 ${selectedId === conversation.id ? 'bg-primary/5' : ''}`}
+                                >
+                                    <LeadAvatar name={conversation.lead_name} domain={conversation.domain} />
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <span className={`truncate text-sm ${conversation.is_read ? 'font-medium text-slate-700' : 'font-semibold text-slate-900'}`}>
+                                                {conversation.lead_name}
+                                            </span>
+                                            <span className="shrink-0 text-xs text-slate-400">{formatListTime(conversation.last_message_at)}</span>
+                                        </div>
+                                        {conversation.domain && <p className="truncate text-xs text-slate-500">{conversation.domain}</p>}
+                                        {/* The category color tints the tag: a light background with the color as text */}
+                                        {category && (
+                                            <span className="mt-1 inline-flex max-w-full truncate rounded-full px-2 py-0.5 text-xs font-medium" style={{ backgroundColor: `${category.color}1a`, color: category.color }}>
+                                                {category.name}
+                                            </span>
+                                        )}
                                     </div>
-                                    {conversation.domain && <p className="truncate text-xs text-slate-500">{conversation.domain}</p>}
-                                    <p className={`mt-0.5 truncate text-xs ${conversation.is_read ? 'text-slate-400' : 'text-slate-600'}`}>{conversation.subject}</p>
-                                </div>
-                                {!conversation.is_read && <span className="size-2 shrink-0 rounded-full bg-blue-500" />}
-                            </button>
-                        </li>
-                    ))}
+                                    {!conversation.is_read && <span className="size-2 shrink-0 rounded-full bg-blue-500" />}
+                                </button>
+                            </li>
+                        )
+                    })}
                 </ul>
             </aside>
 
@@ -328,9 +403,9 @@ export default function Inbox() {
                         <>
                             <div className="flex items-center gap-3 border-b border-slate-200 px-6 py-4">
                                 <LeadAvatar name={thread.conversation.lead_name} domain={thread.conversation.domain} />
-                                <div className="min-w-0">
+                                <div className="min-w-0 flex-1">
                                     <h2 className="truncate font-semibold text-slate-900">{thread.conversation.lead_name}</h2>
-                                    <div className="mt-0.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
+                                    <div className="mt-0.5 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-500">
                                         <a href={`mailto:${thread.conversation.lead_email}`} className="inline-flex items-center gap-1 transition hover:text-primary">
                                             <Mail className="size-3.5" />
                                             {thread.conversation.lead_email}
@@ -341,16 +416,20 @@ export default function Inbox() {
                                                 {thread.conversation.phone}
                                             </a>
                                         )}
+                                        {/* The negative margin keeps the taller dropdown from pushing the email and phone away from the name */}
                                         {thread.conversation.lead_id && (
-                                            <CategorySelect
-                                                categories={categories}
-                                                value={thread.conversation.category_id}
-                                                onChange={changeCategory}
-                                                label={`Category for ${thread.conversation.lead_name}`}
-                                            />
+                                            <div className="-my-1">
+                                                <CategorySelect
+                                                    categories={categories}
+                                                    value={thread.conversation.category_id}
+                                                    onChange={changeCategory}
+                                                    label={`Category for ${thread.conversation.lead_name}`}
+                                                />
+                                            </div>
                                         )}
                                     </div>
                                 </div>
+                                <ConversationMenu onDelete={() => setConfirmDelete(true)} />
                             </div>
 
                             {/* Your emails sit on the right, the lead's replies on the left */}
@@ -411,6 +490,17 @@ export default function Inbox() {
                 <div className="flex flex-1 items-center justify-center text-sm text-slate-400">
                     Select a conversation to read
                 </div>
+            )}
+
+            {confirmDelete && thread && (
+                <ConfirmationModal
+                    title="Delete conversation"
+                    message={`Delete your conversation with ${thread.conversation.lead_name}? It's removed from LeadAgent only; the emails stay in your mailbox.`}
+                    confirmLabel="Delete conversation"
+                    loading={deleteLoading}
+                    onConfirm={deleteConversation}
+                    onClose={() => setConfirmDelete(false)}
+                />
             )}
         </div>
     )

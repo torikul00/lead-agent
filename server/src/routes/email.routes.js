@@ -2,7 +2,7 @@ import { Router } from 'express';
 const router = Router();
 import { createTemplate, deleteTemplate, getTemplate, getTemplates, updateTemplate, uploadTemplateImage } from '../controllers/email.controller.js';
 import { connectMailbox, disconnectMailbox, getMailboxes, mailboxCallback } from '../controllers/mailbox.controller.js';
-import { checkReplies, getConversation, getConversations, getUnreadCount, replyToConversation, sendBulkEmailToLead } from '../controllers/inbox.controller.js';
+import { checkReplies, deleteConversation, getConversation, getConversations, getUnreadCount, replyToConversation, sendBulkEmailToLead } from '../controllers/inbox.controller.js';
 import { emailTemplateSchema, replySchema, sendBulkEmailSchema } from '../validation/email.validation.js';
 import authMiddleware from '../../middlewares/authMiddleware.js';
 import { createFileUploadMiddleware, withUploadErrorHandling } from '../../middlewares/fileUpload.middleware.js';
@@ -22,6 +22,7 @@ router.post('/check_replies', checkReplies);
 router.get('/unread_count', getUnreadCount);
 router.get('/conversations', getConversations);
 router.get('/conversations/:id', getConversation);
+router.delete('/conversations/:id', deleteConversation);
 router.post('/conversations/:id/reply', validate(replySchema), replyToConversation);
 
 router.get('/templates', getTemplates);

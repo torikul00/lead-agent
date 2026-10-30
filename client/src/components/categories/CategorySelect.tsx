@@ -8,7 +8,7 @@ type CategoryOption = {
 }
 
 const classNames = {
-    control: ({ isFocused }: { isFocused: boolean }) => `min-h-9 min-w-48 cursor-pointer rounded-lg border bg-white px-2 text-xs transition ${isFocused ? 'border-primary ring-4 ring-primary/15' : 'border-slate-200 hover:border-slate-300'}`,
+    control: ({ isFocused }: { isFocused: boolean }) => `min-h-7 min-w-48 cursor-pointer rounded-lg border bg-white px-2 text-xs transition ${isFocused ? 'border-primary ring-4 ring-primary/15' : 'border-slate-200 hover:border-slate-300'}`,
     valueContainer: () => 'px-1',
     singleValue: () => 'text-slate-700',
     input: () => 'text-slate-700',
