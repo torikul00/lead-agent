@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import { escapeHtml } from '../../utils/helper.js';
 
 const AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -24,6 +25,21 @@ const readResponse = async (response) => {
     }
     return data;
 };
+
+// "Jane Doe <jane@acme.se>" -> "jane@acme.se"
+const toAddress = (value) => (value.match(/<([^>]+)>/)?.[1] ?? value).trim().toLowerCase();
+
+// The first part of this type that has content, searching inside multipart sections
+const findPart = (part, mimeType) => {
+    if (part.mimeType === mimeType && part.body?.data) return part;
+    for (const child of part.parts ?? []) {
+        const found = findPart(child, mimeType);
+        if (found) return found;
+    }
+    return null;
+};
+
+const decodePart = (part) => Buffer.from(part.body.data, 'base64url').toString('utf8');
 
 export default {
     name: 'gmail',
@@ -124,6 +140,48 @@ export default {
         }));
 
         return { message_id: sent.id, thread_id: sent.threadId };
+    },
+
+    // Ids and threads of every email since the given time, sent ones included
+    async listMessages(accessToken, since) {
+        const messages = [];
+        let pageToken = '';
+
+        do {
+            const params = new URLSearchParams({ q: `after:${Math.floor(since.getTime() / 1000)}`, maxResults: '100' });
+            if (pageToken) params.set('pageToken', pageToken);
+
+            const page = await readResponse(await fetch(`${API_URL}/users/me/messages?${params}`, {
+                headers: { Authorization: `Bearer ${accessToken}` },
+                signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+            }));
+            messages.push(...(page.messages ?? []).map((item) => ({ id: item.id, thread_id: item.threadId })));
+            pageToken = page.nextPageToken;
+        } while (pageToken);
+
+        return messages;
+    },
+
+    // One email with its sender, subject and body; a plain-text email is wrapped as simple HTML
+    async getMessage(accessToken, id) {
+        const message = await readResponse(await fetch(`${API_URL}/users/me/messages/${id}?format=full`, {
+            headers: { Authorization: `Bearer ${accessToken}` },
+            signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        }));
+
+        const header = (name) => message.payload.headers.find((item) => item.name.toLowerCase() === name)?.value ?? '';
+        const html = findPart(message.payload, 'text/html');
+        const text = findPart(message.payload, 'text/plain');
+
+        return {
+            id: message.id,
+            thread_id: message.threadId,
+            from: toAddress(header('from')),
+            to: toAddress(header('to')),
+            subject: header('subject'),
+            body: html ? decodePart(html) : `<div style="white-space:pre-wrap">${escapeHtml(text ? decodePart(text) : '')}</div>`,
+            sent_at: new Date(Number(message.internalDate)),
+        };
     },
 
     // Remove the app's access on Google's side as well

@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState, type SubmitEvent, type SyntheticEvent } from 'react'
-import { LoaderCircle, Mail, Phone, Send } from 'lucide-react'
+import { useEffect, useEffectEvent, useRef, useState, type SubmitEvent, type SyntheticEvent } from 'react'
+import { LoaderCircle, Mail, Phone, RefreshCw, Send } from 'lucide-react'
 import api from '@/lib/axios.ts'
+import socket from '@/lib/socket.ts'
 import getErrorMessage from '@/lib/getErrorMessage.ts'
+import useInboxStore from '@/store/inbox.store.ts'
 import FormAlert from '@/components/FormAlert.tsx'
 import RichTextEditor from '@/components/emailTemplates/RichTextEditor.tsx'
 import CategorySelect from '@/components/categories/CategorySelect.tsx'
@@ -91,6 +93,7 @@ export default function Inbox() {
     const [conversations, setConversations] = useState<Conversation[]>([])
     const [categories, setCategories] = useState<Category[]>([])
     const [loading, setLoading] = useState(true)
+    const [checking, setChecking] = useState(false)
     const [error, setError] = useState('')
     const [selectedId, setSelectedId] = useState<string | null>(null)
     const [thread, setThread] = useState<Thread | null>(null)
@@ -98,11 +101,15 @@ export default function Inbox() {
     const [draft, setDraft] = useState('')
     const [sending, setSending] = useState(false)
     const [replyError, setReplyError] = useState('')
-    // Counts sent replies; a new count clears the editor and scrolls to the new email
+    // Counts sent replies; a new count clears the editor
     const [sentCount, setSentCount] = useState(0)
     // The conversation clicked last, so a slow answer for an earlier click is ignored
     const openedId = useRef<string | null>(null)
-    const lastMessageRef = useRef<HTMLElement>(null)
+    const threadRef = useRef<HTMLDivElement>(null)
+    const threadContentRef = useRef<HTMLDivElement>(null)
+    // While the conversation is scrolled to the bottom it stays there, also as email bodies load or new emails arrive
+    const atBottom = useRef(true)
+    const fetchUnreadCount = useInboxStore((state) => state.fetchUnreadCount)
 
     useEffect(() => {
         Promise.all([api.get('/emails/conversations'), api.get('/categories')])
@@ -114,12 +121,22 @@ export default function Inbox() {
             .finally(() => setLoading(false))
     }, [])
 
+    // Email bodies finish loading after the conversation opens and grow, so the scroll follows them while it's at the bottom
     useEffect(() => {
-        if (sentCount) lastMessageRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }, [sentCount])
+        const container = threadRef.current
+        const content = threadContentRef.current
+        if (!container || !content) return
+
+        const observer = new ResizeObserver(() => {
+            if (atBottom.current) container.scrollTop = container.scrollHeight
+        })
+        observer.observe(content)
+        return () => observer.disconnect()
+    }, [thread?.conversation.id])
 
     const openConversation = async (id: string) => {
         openedId.current = id
+        atBottom.current = true
         setSelectedId(id)
         setThread(null)
         setThreadError('')
@@ -131,8 +148,53 @@ export default function Inbox() {
             if (openedId.current !== id) return
             setThread(data)
             setConversations((current) => current.map((item) => (item.id === id ? { ...item, is_read: true } : item)))
+            fetchUnreadCount()
         } catch (err) {
             if (openedId.current === id) setThreadError(getErrorMessage(err))
+        }
+    }
+
+    // Reload the list, and the open conversation when it may have new emails; the open one counts as read since it's on screen
+    const reloadInbox = async (changedIds?: string[]) => {
+        const openId = openedId.current
+        const { data } = await api.get('/emails/conversations')
+        setConversations(data.conversations.map((item: Conversation) => (item.id === openId ? { ...item, is_read: true } : item)))
+
+        if (openId && (!changedIds || changedIds.includes(openId))) {
+            const { data: threadData } = await api.get(`/emails/conversations/${openId}`)
+            if (openedId.current === openId) setThread(threadData)
+        }
+
+        // Updated last, after the open conversation was marked read
+        fetchUnreadCount()
+    }
+
+    // The server reports new emails (usually lead replies) as soon as it saves them
+    const onInboxUpdated = useEffectEvent((changedIds: string[]) => {
+        // A failed background reload is fixed by the next update or refresh
+        reloadInbox(changedIds).catch(() => {})
+    })
+
+    useEffect(() => {
+        const handleInboxUpdated = ({ conversation_ids }: { conversation_ids: string[] }) => onInboxUpdated(conversation_ids)
+        socket.on('inbox_updated', handleInboxUpdated)
+        return () => {
+            socket.off('inbox_updated', handleInboxUpdated)
+        }
+    }, [])
+
+    // Check the mailboxes right away instead of waiting for the next automatic check
+    const checkReplies = async () => {
+        setChecking(true)
+        setError('')
+
+        try {
+            await api.post('/emails/check_replies')
+            await reloadInbox()
+        } catch (err) {
+            setError(getErrorMessage(err))
+        } finally {
+            setChecking(false)
         }
     }
 
@@ -158,6 +220,7 @@ export default function Inbox() {
 
         try {
             const { data } = await api.post(`/emails/conversations/${conversationId}/reply`, { body: draft })
+            atBottom.current = true
             setThread((current) => (current?.conversation.id === conversationId ? { ...current, messages: [...current.messages, data.message] } : current))
 
             // The conversation moves to the top of the list, like a new email would
@@ -178,17 +241,30 @@ export default function Inbox() {
     const unreadCount = conversations.filter((item) => !item.is_read).length
 
     return (
-        <div className="flex h-[calc(100vh-4rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        // The negative margins cancel the dashboard's page padding, so the inbox fills everything below the header
+        <div className="-m-4 flex h-[calc(100vh-4rem)] overflow-hidden bg-white sm:-m-6 lg:-m-8">
 
             {/* Conversation list */}
-            <aside className="flex w-80 shrink-0 flex-col border-r border-slate-200">
+            <aside className="flex w-96 shrink-0 flex-col border-r border-slate-200">
                 <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-                    <h1 className="font-semibold text-slate-900">Inbox</h1>
-                    {unreadCount > 0 && (
-                        <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-white">
-                            {unreadCount}
-                        </span>
-                    )}
+                    <div className="flex items-center gap-2">
+                        <h1 className="font-semibold text-slate-900">Inbox</h1>
+                        {unreadCount > 0 && (
+                            <span className="rounded-full bg-blue-500 px-2 py-0.5 text-xs font-medium text-white">
+                                {unreadCount}
+                            </span>
+                        )}
+                    </div>
+                    <button
+                        type="button"
+                        onClick={checkReplies}
+                        disabled={checking}
+                        title="Check for new replies"
+                        aria-label="Check for new replies"
+                        className="cursor-pointer rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed"
+                    >
+                        <RefreshCw className={`size-4 ${checking ? 'animate-spin' : ''}`} />
+                    </button>
                 </div>
 
                 {loading && (
@@ -226,7 +302,7 @@ export default function Inbox() {
                                     {conversation.domain && <p className="truncate text-xs text-slate-500">{conversation.domain}</p>}
                                     <p className={`mt-0.5 truncate text-xs ${conversation.is_read ? 'text-slate-400' : 'text-slate-600'}`}>{conversation.subject}</p>
                                 </div>
-                                {!conversation.is_read && <span className="size-2 shrink-0 rounded-full bg-primary" />}
+                                {!conversation.is_read && <span className="size-2 shrink-0 rounded-full bg-blue-500" />}
                             </button>
                         </li>
                     ))}
@@ -278,14 +354,21 @@ export default function Inbox() {
                             </div>
 
                             {/* Your emails sit on the right, the lead's replies on the left */}
-                            <div className="flex-1 overflow-y-auto bg-slate-50 px-6 py-6">
-                                <div className="space-y-4">
-                                    {thread.messages.map((message, index) => {
+                            <div
+                                ref={threadRef}
+                                // Within 40px of the bottom counts as at the bottom; scrolling up stops following new emails
+                                onScroll={(event) => {
+                                    const container = event.currentTarget
+                                    atBottom.current = container.scrollHeight - container.scrollTop - container.clientHeight < 40
+                                }}
+                                className="flex-1 overflow-y-auto bg-slate-50 px-6 py-6"
+                            >
+                                <div ref={threadContentRef} className="space-y-4">
+                                    {thread.messages.map((message) => {
                                         const sent = message.direction === 'sent'
                                         return (
                                             <article
                                                 key={message.id}
-                                                ref={index === thread.messages.length - 1 ? lastMessageRef : undefined}
                                                 className={`max-w-3xl rounded-2xl border bg-white px-5 py-4 shadow-sm ${sent ? 'ml-auto border-primary/20' : 'border-slate-200'}`}
                                             >
                                                 <div className="flex items-start justify-between gap-3">

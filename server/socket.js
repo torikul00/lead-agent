@@ -48,6 +48,12 @@ export function notifyUserSessionInvalidated(userId, reason = 'password_changed'
     io.to(userRoom(userId)).emit('session_invalidated', { reason });
 }
 
+// New emails (usually lead replies) were saved in these conversations
+export function notifyInboxUpdated(userId, conversationIds) {
+    if (!io) return;
+    io.to(userRoom(userId)).emit('inbox_updated', { conversation_ids: conversationIds });
+}
+
 export function createHttpServer(app) {
     const httpServer = createServer(app);
     attachSocketIO(httpServer);

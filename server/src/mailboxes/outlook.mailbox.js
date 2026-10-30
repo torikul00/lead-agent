@@ -112,6 +112,41 @@ export default {
         return { message_id: draft.id, thread_id: draft.conversationId };
     },
 
+    // Ids and conversations of every email since the given time, sent ones included; drafts are skipped
+    async listMessages(accessToken, since) {
+        const messages = [];
+        let url = `${API_URL}/me/messages?$filter=${encodeURIComponent(`receivedDateTime ge ${since.toISOString()}`)}&$select=id,conversationId,isDraft&$top=100`;
+
+        while (url) {
+            const page = await readResponse(await fetch(url, {
+                headers: { Authorization: `Bearer ${accessToken}`, Prefer: 'IdType="ImmutableId"' },
+                signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+            }));
+            messages.push(...page.value.filter((item) => !item.isDraft).map((item) => ({ id: item.id, thread_id: item.conversationId })));
+            url = page['@odata.nextLink'];
+        }
+
+        return messages;
+    },
+
+    // One email with its sender, subject and body as HTML
+    async getMessage(accessToken, id) {
+        const message = await readResponse(await fetch(`${API_URL}/me/messages/${id}?$select=id,conversationId,from,toRecipients,subject,body,sentDateTime,receivedDateTime`, {
+            headers: { Authorization: `Bearer ${accessToken}`, Prefer: 'IdType="ImmutableId", outlook.body-content-type="html"' },
+            signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        }));
+
+        return {
+            id: message.id,
+            thread_id: message.conversationId,
+            from: message.from?.emailAddress?.address?.toLowerCase() ?? '',
+            to: message.toRecipients?.[0]?.emailAddress?.address?.toLowerCase() ?? '',
+            subject: message.subject ?? '',
+            body: message.body?.content ?? '',
+            sent_at: new Date(message.sentDateTime ?? message.receivedDateTime),
+        };
+    },
+
     // Microsoft has no way to revoke one app's token, so deleting it on our side is enough
     async revoke() {},
 };

@@ -19,8 +19,10 @@ export const emailTemplateSchema = z.object({
         .default(Object.fromEntries(TEMPLATE_VARIANT_KEYS.map((key) => [key, null]))),
 });
 
-// A reply written in the Inbox
-export const replySchema = z.object({ body });
+// A reply written in the Inbox; it can also be just an image
+export const replySchema = z.object({
+    body: z.string().max(10000, 'Reply is too long').refine((html) => hasText(html) || /<img\s/i.test(html), 'Write a message or add an image'),
+});
 
 const objectId = (message) => z.string().regex(/^[a-f\d]{24}$/i, message);
 

@@ -11,6 +11,7 @@ import userRoutes from './src/routes/user.routes.js';
 import leadRoutes from './src/routes/lead.routes.js';
 import emailRoutes from './src/routes/email.routes.js';
 import categoryRoutes from './src/routes/category.routes.js';
+import { startMailboxSync } from './src/mailboxes/sync.js';
 
 connectDB();
 
@@ -73,3 +74,6 @@ const httpServer = createHttpServer(app);
 httpServer.listen(PORT, () => {
     console.log(`Server (HTTP + Socket.IO) is running on port ${PORT}`);
 });
+
+// Look for lead replies in the connected mailboxes
+startMailboxSync();

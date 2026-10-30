@@ -121,6 +121,11 @@ export type EmailMessage = {
     sent_at: string
 }
 
+export type InboxState = {
+    unreadCount: number
+    fetchUnreadCount: () => Promise<void>
+}
+
 export type AuthState = {
     user: User | null
     loading: boolean

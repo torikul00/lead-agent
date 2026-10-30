@@ -1,5 +1,8 @@
+import { useEffect } from 'react'
 import { NavLink } from 'react-router'
 import { Inbox, List, Mail, Radar, Search, Settings, Tag, X } from 'lucide-react'
+import socket from '@/lib/socket.ts'
+import useInboxStore from '@/store/inbox.store.ts'
 
 const navItems = [
     { to: '/search-leads', label: 'Search leads', icon: Search },
@@ -17,6 +20,18 @@ type SidebarProps = {
 }
 
 export default function Sidebar({ collapsed, mobileOpen, onClose }: SidebarProps) {
+    const unreadCount = useInboxStore((state) => state.unreadCount)
+    const fetchUnreadCount = useInboxStore((state) => state.fetchUnreadCount)
+
+    // Load the unread count, and update it whenever new emails arrive
+    useEffect(() => {
+        fetchUnreadCount()
+        socket.on('inbox_updated', fetchUnreadCount)
+        return () => {
+            socket.off('inbox_updated', fetchUnreadCount)
+        }
+    }, [fetchUnreadCount])
+
     return (
         <>
             {mobileOpen && <div className="fixed inset-0 z-30 bg-slate-900/40 lg:hidden" onClick={onClose} />}
@@ -41,10 +56,15 @@ export default function Sidebar({ collapsed, mobileOpen, onClose }: SidebarProps
                             to={to}
                             onClick={onClose}
                             title={collapsed ? label : undefined}
-                            className={({ isActive }) => `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${collapsed ? 'lg:justify-center' : ''} ${isActive ? 'bg-primary/10 text-primary' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
+                            className={({ isActive }) => `relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${collapsed ? 'lg:justify-center' : ''} ${isActive ? 'bg-primary/10 text-primary' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
                         >
                             <Icon className="size-5 shrink-0" />
                             <span className={collapsed ? 'lg:hidden' : ''}>{label}</span>
+                            {to === '/inbox' && unreadCount > 0 && (
+                                <span className={`ml-auto rounded-full bg-blue-500 px-2 py-0.5 text-xs font-medium text-white ${collapsed ? 'lg:absolute lg:top-0.5 lg:right-1 lg:px-1.5' : ''}`}>
+                                    {unreadCount}
+                                </span>
+                            )}
                         </NavLink>
                     ))}
                 </nav>

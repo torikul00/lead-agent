@@ -61,7 +61,7 @@ const editLink = (editor: Editor) => {
 type RichTextEditorProps = {
     value: string
     onChange: (html: string) => void
-    // A smaller editor with text formatting only (no images or placeholders), for replies
+    // A smaller editor without template placeholders, for replies
     simple?: boolean
 }
 
@@ -70,8 +70,9 @@ export default function RichTextEditor({ value, onChange, simple = false }: Rich
     const [uploading, setUploading] = useState(false)
     const [uploadError, setUploadError] = useState('')
     const starterKit = StarterKit.configure({ heading: false, blockquote: false, code: false, codeBlock: false, horizontalRule: false, link: { openOnClick: false } })
+    const image = Image.configure({ inline: false, allowBase64: false })
     const editor = useEditor({
-        extensions: simple ? [starterKit] : [starterKit, Image.configure({ inline: false, allowBase64: false }), PlaceholderHighlight],
+        extensions: simple ? [starterKit, image] : [starterKit, image, PlaceholderHighlight],
         content: value,
         // Re-render on every change so the toolbar shows the formatting under the cursor
         shouldRerenderOnTransaction: true,
@@ -120,16 +121,16 @@ export default function RichTextEditor({ value, onChange, simple = false }: Rich
                     <ToolbarButton key={tool.name} label={tool.label} icon={tool.icon} active={editor.isActive(tool.name)} onClick={tool.run} />
                 ))}
 
+                <span className="mx-1 h-5 w-px bg-slate-200" />
+
+                <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={handleImageChange} />
+                <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading} title="Upload image" aria-label="Upload image" className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 disabled:cursor-wait disabled:opacity-60">
+                    {uploading ? <LoaderCircle className="size-4 animate-spin" /> : <ImagePlus className="size-4" />}
+                    {uploading ? 'Uploading...' : 'Image'}
+                </button>
+
                 {!simple && (
                     <>
-                        <span className="mx-1 h-5 w-px bg-slate-200" />
-
-                        <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={handleImageChange} />
-                        <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading} title="Upload image" aria-label="Upload image" className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 disabled:cursor-wait disabled:opacity-60">
-                            {uploading ? <LoaderCircle className="size-4 animate-spin" /> : <ImagePlus className="size-4" />}
-                            {uploading ? 'Uploading...' : 'Image'}
-                        </button>
-
                         <span className="mx-1 h-5 w-px bg-slate-200" />
 
                         {TEMPLATE_PLACEHOLDERS.map((placeholder) => (

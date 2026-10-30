@@ -22,22 +22,23 @@ const emailMessageSchema = new Schema({
         type: String,
         required: true,
     },
+    // Emails that arrive can leave any of these empty
     from: {
         type: String,
-        required: true,
+        default: '',
     },
     to: {
         type: String,
-        required: true,
+        default: '',
     },
     subject: {
         type: String,
-        required: true,
+        default: '',
     },
     // HTML
     body: {
         type: String,
-        required: true,
+        default: '',
     },
     sent_at: {
         type: Date,
@@ -46,6 +47,7 @@ const emailMessageSchema = new Schema({
 }, { timestamps: true, collection: 'email_messages' });
 
 emailMessageSchema.index({ conversation_id: 1, sent_at: 1 });
+emailMessageSchema.index({ conversation_id: 1, provider_message_id: 1 }, { unique: true });
 
 const EmailMessage = model('EmailMessage', emailMessageSchema);
 

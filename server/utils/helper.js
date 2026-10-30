@@ -178,6 +178,11 @@ export const addContact = (lead, contact) => {
 // Emails a lead has, on the company and on its people
 export const countEmails = (lead) => lead.company_emails.length + lead.contacts.filter((contact) => contact.email).length;
 
+export const escapeHtml = (text) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+// Plain-text preview of an email body for the Inbox list; styles and the head of a full HTML email are dropped first
+export const toSnippet = (html) => html.replace(/<(head|style|script)[\s\S]*?<\/\1>/gi, ' ').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
+
 // The company email a lead is emailed at: the first one found on its website, otherwise the first from Geoapify; null skips the lead
 export const chooseLeadEmail = (lead) => {
     const fromWebsite = lead.company_emails.find((item) => item.source_name === 'Company website');

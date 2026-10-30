@@ -5,12 +5,11 @@ import EmailTemplate from '../models/emailTemplate.model.js';
 import Conversation from '../models/conversation.model.js';
 import EmailMessage from '../models/emailMessage.model.js';
 import { sendFromMailbox } from '../mailboxes/index.js';
+import { syncUserMailboxes } from '../mailboxes/sync.js';
 import { TEMPLATE_VARIANT_KEYS } from '../../utils/constants.js';
-import { chooseLeadEmail } from '../../utils/helper.js';
+import { chooseLeadEmail, escapeHtml, toSnippet } from '../../utils/helper.js';
 
 const PLACEHOLDER = /\{\{(\w+)\}\}/g;
-
-const escapeHtml = (text) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 // The template's version for the lead's email provider ("Microsoft 365" -> microsoft_365), with {{placeholders}} filled in; company addresses have no contact name
 const fillTemplate = (template, lead) => {
@@ -26,9 +25,6 @@ const fillTemplate = (template, lead) => {
 
     return { subject: fill(content.subject, false), body: fill(content.body, true) };
 };
-
-// Plain-text preview of an email body for the Inbox list
-const toSnippet = (html) => html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
 
 // Lead details the Inbox shows with a conversation
 const LEAD_FIELDS = 'name domain phone category_id';
@@ -93,6 +89,28 @@ export const getConversation = async (req, res) => {
     } catch (err) {
         console.error('Loading conversation failed:', err);
         return res.status(500).json({ error: 'Could not load this conversation right now. Please try again.' });
+    }
+};
+
+// POST /api/emails/check_replies — check the user's mailboxes now instead of waiting for the next automatic check
+export const checkReplies = async (req, res) => {
+    try {
+        await syncUserMailboxes(req.user._id);
+        return res.status(200).json({ message: 'Mailboxes checked.' });
+    } catch (err) {
+        console.error('Checking for replies failed:', err);
+        return res.status(500).json({ error: 'Could not check for replies right now. Please try again.' });
+    }
+};
+
+// GET /api/emails/unread_count — conversations with an unread reply, for the sidebar badge
+export const getUnreadCount = async (req, res) => {
+    try {
+        const count = await Conversation.countDocuments({ user_id: req.user._id, is_read: false });
+        return res.status(200).json({ count });
+    } catch (err) {
+        console.error('Counting unread conversations failed:', err);
+        return res.status(500).json({ error: 'Could not load your unread count right now.' });
     }
 };
 

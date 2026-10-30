@@ -23,6 +23,9 @@ export const COUNTRY_CODES = {
     'United Kingdom': 'GB', 'United States': 'US', 'Vietnam': 'VN',
 };
 
+// How often connected mailboxes are checked for lead replies
+export const MAILBOX_SYNC_MINUTES = 2;
+
 // Contact finding: how many company websites are read at once, and the most people and emails kept per lead
 export const ENRICH_CONCURRENCY = 8;
 export const MAX_CONTACTS = 10;

@@ -36,6 +36,11 @@ const mailboxSchema = new Schema({
         enum: ['connected', 'disconnected'],
         default: 'connected',
     },
+    // When the mailbox was last checked for lead replies
+    last_synced_at: {
+        type: Date,
+        default: null,
+    },
 }, { timestamps: true, collection: 'mailboxes' });
 
 mailboxSchema.index({ user_id: 1, email: 1 }, { unique: true });

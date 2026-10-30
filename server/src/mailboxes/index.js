@@ -9,7 +9,7 @@ export const MAILBOXES = { gmail, outlook };
 const TOKEN_REFRESH_MARGIN_MS = 5 * 60 * 1000;
 
 // A working access token for the mailbox document, renewed and saved when it's about to expire
-const getAccessToken = async (mailbox) => {
+export const getAccessToken = async (mailbox) => {
     if (mailbox.token_expires_at > Date.now() + TOKEN_REFRESH_MARGIN_MS) return decrypt(mailbox.access_token);
 
     let tokens;
