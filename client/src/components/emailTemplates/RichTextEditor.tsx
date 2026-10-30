@@ -61,20 +61,23 @@ const editLink = (editor: Editor) => {
 type RichTextEditorProps = {
     value: string
     onChange: (html: string) => void
+    // A smaller editor with text formatting only (no images or placeholders), for replies
+    simple?: boolean
 }
 
-export default function RichTextEditor({ value, onChange }: RichTextEditorProps) {
+export default function RichTextEditor({ value, onChange, simple = false }: RichTextEditorProps) {
     const fileInputRef = useRef<HTMLInputElement>(null)
     const [uploading, setUploading] = useState(false)
     const [uploadError, setUploadError] = useState('')
+    const starterKit = StarterKit.configure({ heading: false, blockquote: false, code: false, codeBlock: false, horizontalRule: false, link: { openOnClick: false } })
     const editor = useEditor({
-        extensions: [StarterKit.configure({ heading: false, blockquote: false, code: false, codeBlock: false, horizontalRule: false, link: { openOnClick: false } }), Image.configure({ inline: false, allowBase64: false }), PlaceholderHighlight],
+        extensions: simple ? [starterKit] : [starterKit, Image.configure({ inline: false, allowBase64: false }), PlaceholderHighlight],
         content: value,
         // Re-render on every change so the toolbar shows the formatting under the cursor
         shouldRerenderOnTransaction: true,
         // An empty editor still holds "<p></p>", so report it as empty
         onUpdate: ({ editor }) => onChange(editor.isEmpty ? '' : editor.getHTML()),
-        editorProps: { attributes: { 'aria-label': 'Email body', class: 'rich-text min-h-60 px-4 py-3 text-sm text-slate-900 outline-none' } },
+        editorProps: { attributes: { 'aria-label': simple ? 'Reply' : 'Email body', class: `rich-text ${simple ? 'max-h-60 min-h-24 overflow-y-auto' : 'min-h-60'} px-4 py-3 text-sm text-slate-900 outline-none` } },
     })
 
     if (!editor) return null
@@ -117,21 +120,25 @@ export default function RichTextEditor({ value, onChange }: RichTextEditorProps)
                     <ToolbarButton key={tool.name} label={tool.label} icon={tool.icon} active={editor.isActive(tool.name)} onClick={tool.run} />
                 ))}
 
-                <span className="mx-1 h-5 w-px bg-slate-200" />
+                {!simple && (
+                    <>
+                        <span className="mx-1 h-5 w-px bg-slate-200" />
 
-                <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={handleImageChange} />
-                <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading} title="Upload image" aria-label="Upload image" className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 disabled:cursor-wait disabled:opacity-60">
-                    {uploading ? <LoaderCircle className="size-4 animate-spin" /> : <ImagePlus className="size-4" />}
-                    {uploading ? 'Uploading...' : 'Image'}
-                </button>
+                        <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={handleImageChange} />
+                        <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading} title="Upload image" aria-label="Upload image" className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 disabled:cursor-wait disabled:opacity-60">
+                            {uploading ? <LoaderCircle className="size-4 animate-spin" /> : <ImagePlus className="size-4" />}
+                            {uploading ? 'Uploading...' : 'Image'}
+                        </button>
 
-                <span className="mx-1 h-5 w-px bg-slate-200" />
+                        <span className="mx-1 h-5 w-px bg-slate-200" />
 
-                {TEMPLATE_PLACEHOLDERS.map((placeholder) => (
-                    <button key={placeholder} type="button" onClick={() => editor.chain().focus().insertContent(`{{${placeholder}}}`).run()} title="Insert placeholder" className="cursor-pointer rounded-md bg-slate-100 px-2 py-1 font-mono text-xs text-slate-600 transition hover:bg-primary/10 hover:text-primary">
-                        {`{{${placeholder}}}`}
-                    </button>
-                ))}
+                        {TEMPLATE_PLACEHOLDERS.map((placeholder) => (
+                            <button key={placeholder} type="button" onClick={() => editor.chain().focus().insertContent(`{{${placeholder}}}`).run()} title="Insert placeholder" className="cursor-pointer rounded-md bg-slate-100 px-2 py-1 font-mono text-xs text-slate-600 transition hover:bg-primary/10 hover:text-primary">
+                                {`{{${placeholder}}}`}
+                            </button>
+                        ))}
+                    </>
+                )}
             </div>
 
             <EditorContent editor={editor} />

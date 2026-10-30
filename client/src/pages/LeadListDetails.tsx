@@ -6,6 +6,7 @@ import api from '@/lib/axios.ts'
 import getErrorMessage from '@/lib/getErrorMessage.ts'
 import FormAlert from '@/components/FormAlert.tsx'
 import LeadsTable from '@/components/leads/LeadsTable.tsx'
+import SendEmailModal from '@/components/leads/SendEmailModal.tsx'
 import type { Category, Lead, LeadList } from '@/types/index.ts'
 
 export default function LeadListDetails() {
@@ -17,6 +18,7 @@ export default function LeadListDetails() {
     const [categories, setCategories] = useState<Category[]>([])
     const [search, setSearch] = useState('')
     const [categoryFilter, setCategoryFilter] = useState('')
+    const [sendingTo, setSendingTo] = useState<Lead | null>(null)
 
     useEffect(() => {
         Promise.all([api.get(`/leads/lists/${id}`), api.get('/categories')])
@@ -115,8 +117,20 @@ export default function LeadListDetails() {
                                 setError(getErrorMessage(err))
                             }
                         }}
+                        onSendEmail={setSendingTo}
                     />
                 </section>
+            )}
+
+            {sendingTo && (
+                <SendEmailModal
+                    lead={sendingTo}
+                    onClose={() => setSendingTo(null)}
+                    onSent={() => {
+                        setLeads((current) => current.map((item) => item.id === sendingTo.id ? { ...item, is_mail_sent: true } : item))
+                        setSendingTo(null)
+                    }}
+                />
             )}
         </div>
     )

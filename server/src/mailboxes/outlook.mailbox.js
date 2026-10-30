@@ -11,7 +11,11 @@ const redirectUri = () => `${process.env.SERVER_URL}/api/emails/mailboxes/outloo
 // Microsoft's JSON reply; the reason of a failed request only goes to the server log
 const readResponse = async (response) => {
     const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(`Microsoft request failed with status ${response.status}: ${data.error_description ?? data.error?.message ?? data.error ?? 'no details'}`);
+    if (!response.ok) {
+        // "invalid_grant" means the user revoked access or the login expired
+        const code = data.error === 'invalid_grant' ? 'mailbox_disconnected' : undefined;
+        throw Object.assign(new Error(`Microsoft request failed with status ${response.status}: ${data.error_description ?? data.error?.message ?? data.error ?? 'no details'}`), { code });
+    }
     return data;
 };
 
@@ -62,6 +66,50 @@ export default {
             access_token: tokens.access_token,
             token_expires_at: new Date(Date.now() + tokens.expires_in * 1000),
         };
+    },
+
+    // A new access token; Microsoft usually sends a new refresh token too, which replaces the old one
+    async refresh(refreshToken) {
+        const tokens = await readResponse(await fetch(`${LOGIN_URL}/token`, {
+            method: 'POST',
+            body: new URLSearchParams({
+                refresh_token: refreshToken,
+                client_id: process.env.MICROSOFT_CLIENT_ID,
+                client_secret: process.env.MICROSOFT_CLIENT_SECRET,
+                grant_type: 'refresh_token',
+                scope: SCOPES.join(' '),
+            }),
+            signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        }));
+
+        return {
+            refresh_token: tokens.refresh_token ?? refreshToken,
+            access_token: tokens.access_token,
+            token_expires_at: new Date(Date.now() + tokens.expires_in * 1000),
+        };
+    },
+
+    // Send an email, or a reply when replyTo holds the email being answered; it's a draft first because sending directly doesn't return the conversation id
+    async send(accessToken, { to, subject, html, replyTo }) {
+        // Immutable ids stay the same when a message moves from Drafts to Sent Items
+        const headers = { Authorization: `Bearer ${accessToken}`, Prefer: 'IdType="ImmutableId"' };
+        const content = { body: { contentType: 'HTML', content: html }, toRecipients: [{ emailAddress: { address: to } }] };
+
+        // A reply starts from Outlook's own reply draft, which keeps it in the conversation and sets the "RE:" subject
+        const draft = await readResponse(await fetch(replyTo ? `${API_URL}/me/messages/${replyTo.message_id}/createReply` : `${API_URL}/me/messages`, {
+            method: 'POST',
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify(replyTo ? { message: content } : { subject, ...content }),
+            signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        }));
+
+        await readResponse(await fetch(`${API_URL}/me/messages/${draft.id}/send`, {
+            method: 'POST',
+            headers,
+            signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        }));
+
+        return { message_id: draft.id, thread_id: draft.conversationId };
     },
 
     // Microsoft has no way to revoke one app's token, so deleting it on our side is enough

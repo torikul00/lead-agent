@@ -1,5 +1,5 @@
 import { Fragment, useState } from 'react'
-import { Check, Copy, ExternalLink, LoaderCircle, Mail, Phone } from 'lucide-react'
+import { Check, Copy, ExternalLink, LoaderCircle, Mail, MailCheck, Phone, Send } from 'lucide-react'
 import Select from 'react-select'
 import api from '@/lib/axios.ts'
 import getErrorMessage from '@/lib/getErrorMessage.ts'
@@ -145,9 +145,10 @@ type LeadsTableProps = {
     onLeadUpdate?: (lead: Lead) => void
     categories?: Category[]
     onCategoryChange?: (lead: Lead, categoryId: string | null) => Promise<void>
+    onSendEmail?: (lead: Lead) => void
 }
 
-export default function LeadsTable({ leads, selected = [], onSelectedChange, onLeadUpdate, categories = [], onCategoryChange }: LeadsTableProps) {
+export default function LeadsTable({ leads, selected = [], onSelectedChange, onLeadUpdate, categories = [], onCategoryChange, onSendEmail }: LeadsTableProps) {
     const [openRow, setOpenRow] = useState<string | null>(null)
     const allSelected = leads.length > 0 && selected.length === leads.length
 
@@ -180,6 +181,7 @@ export default function LeadsTable({ leads, selected = [], onSelectedChange, onL
                         <th className="px-4 py-3">Contacts</th>
                         <th className="px-4 py-3">Mail server</th>
                         <th className="py-3 pr-6 pl-4">Score</th>
+                        {onSendEmail && <th className="py-3 pr-6 pl-2"><span className="sr-only">Send email</span></th>}
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -307,11 +309,25 @@ export default function LeadsTable({ leads, selected = [], onSelectedChange, onL
                                         </div>
                                         <span className={`mt-1.5 inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${fit.className}`}>{fit.label}</span>
                                     </td>
+                                    {onSendEmail && (
+                                        <td className="py-4 pr-6 pl-2 text-right" onClick={(e) => e.stopPropagation()}>
+                                            <button
+                                                type="button"
+                                                onClick={() => onSendEmail(lead)}
+                                                disabled={!lead.company_emails.length}
+                                                title={!lead.company_emails.length ? 'No company email' : lead.is_mail_sent ? 'Email sent · send again' : 'Send email'}
+                                                aria-label={`Send email to ${lead.name}`}
+                                                className={`cursor-pointer rounded-lg p-2 transition disabled:cursor-not-allowed disabled:opacity-40 ${lead.is_mail_sent ? 'text-emerald-600 hover:bg-emerald-50' : 'text-slate-500 hover:bg-primary/10 hover:text-primary'}`}
+                                            >
+                                                {lead.is_mail_sent ? <MailCheck className="size-4" /> : <Send className="size-4" />}
+                                            </button>
+                                        </td>
+                                    )}
                                 </tr>
 
                                 {open && (
                                     <tr className="bg-slate-50/80">
-                                        <td colSpan={(onSelectedChange ? 8 : 7) + (onCategoryChange ? 1 : 0)} className="px-6 pb-4">
+                                        <td colSpan={(onSelectedChange ? 8 : 7) + (onCategoryChange ? 1 : 0) + (onSendEmail ? 1 : 0)} className="px-6 pb-4">
                                             <div className="grid grid-cols-[1fr_2fr_1fr] gap-6 rounded-xl border border-slate-200 bg-white p-4">
                                                 <div>
                                                     <h3 className="text-xs font-medium tracking-wide text-slate-500 uppercase">About</h3>

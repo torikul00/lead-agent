@@ -56,6 +56,7 @@ export type Lead = {
     fit_label: FitLabel
     score_reasons: string[]
     category_id?: string | null | { _id: string; name: string; color: string }
+    is_mail_sent?: boolean
 }
 
 export type LeadList = {
@@ -94,6 +95,30 @@ export type Mailbox = {
     provider: MailboxProvider
     email: string
     status: 'connected' | 'disconnected'
+}
+
+export type Conversation = {
+    id: string
+    lead_id: string | null
+    lead_name: string
+    domain: string | null
+    phone: string | null
+    category_id: string | null
+    lead_email: string
+    subject: string
+    snippet: string
+    last_message_at: string
+    is_read: boolean
+}
+
+export type EmailMessage = {
+    id: string
+    direction: 'sent' | 'received'
+    from: string
+    to: string
+    subject: string
+    body: string
+    sent_at: string
 }
 
 export type AuthState = {

@@ -110,7 +110,11 @@ const leadSchema = new Schema({
     score_reasons: {
         type: [String],
         default: [],
-    }
+    },
+    is_mail_sent: {
+        type: Boolean,
+        default: false,
+    },
 }, { timestamps: true });
 
 leadSchema.index({ lead_list_id: 1, score: -1 });

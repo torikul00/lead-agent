@@ -2,7 +2,8 @@ import { Router } from 'express';
 const router = Router();
 import { createTemplate, deleteTemplate, getTemplate, getTemplates, updateTemplate, uploadTemplateImage } from '../controllers/email.controller.js';
 import { connectMailbox, disconnectMailbox, getMailboxes, mailboxCallback } from '../controllers/mailbox.controller.js';
-import { emailTemplateSchema } from '../validation/email.validation.js';
+import { getConversation, getConversations, replyToConversation, sendBulkEmailToLead } from '../controllers/inbox.controller.js';
+import { emailTemplateSchema, replySchema, sendBulkEmailSchema } from '../validation/email.validation.js';
 import authMiddleware from '../../middlewares/authMiddleware.js';
 import { createFileUploadMiddleware, withUploadErrorHandling } from '../../middlewares/fileUpload.middleware.js';
 import validate from '../../middlewares/validate.middleware.js';
@@ -15,6 +16,11 @@ router.use(authMiddleware);
 router.get('/mailboxes', getMailboxes);
 router.get('/mailboxes/:provider/connect', connectMailbox);
 router.post('/mailboxes/:id/disconnect', disconnectMailbox);
+
+router.post('/send_bulk', validate(sendBulkEmailSchema), sendBulkEmailToLead);
+router.get('/conversations', getConversations);
+router.get('/conversations/:id', getConversation);
+router.post('/conversations/:id/reply', validate(replySchema), replyToConversation);
 
 router.get('/templates', getTemplates);
 router.get('/templates/:id', getTemplate);

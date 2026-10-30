@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { TEMPLATE_VARIANT_KEYS } from '../../utils/constants.js';
+import { MAX_LEADS, TEMPLATE_VARIANT_KEYS } from '../../utils/constants.js';
 
 // The editor's HTML keeps its tags even when empty ("<p></p>"), so check for text inside
 const hasText = (html) => html.replace(/<[^>]*>/g, '').trim().length > 0;
@@ -17,4 +17,20 @@ export const emailTemplateSchema = z.object({
     variants: z
         .object(Object.fromEntries(TEMPLATE_VARIANT_KEYS.map((key) => [key, variant])))
         .default(Object.fromEntries(TEMPLATE_VARIANT_KEYS.map((key) => [key, null]))),
+});
+
+// A reply written in the Inbox
+export const replySchema = z.object({ body });
+
+const objectId = (message) => z.string().regex(/^[a-f\d]{24}$/i, message);
+
+// One template sent from one of the user's mailboxes to several saved leads
+export const sendBulkEmailSchema = z.object({
+    mailbox_id: objectId('Choose a mailbox to send from'),
+    template_id: objectId('Choose a template'),
+    lead_ids: z
+        .array(objectId('Invalid lead'))
+        .min(1, 'Choose at least one lead')
+        .max(MAX_LEADS, `You can email up to ${MAX_LEADS} leads at a time`)
+        .transform((ids) => [...new Set(ids)]),
 });

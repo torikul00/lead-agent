@@ -178,6 +178,13 @@ export const addContact = (lead, contact) => {
 // Emails a lead has, on the company and on its people
 export const countEmails = (lead) => lead.company_emails.length + lead.contacts.filter((contact) => contact.email).length;
 
+// The company email a lead is emailed at: the first one found on its website, otherwise the first from Geoapify; null skips the lead
+export const chooseLeadEmail = (lead) => {
+    const fromWebsite = lead.company_emails.find((item) => item.source_name === 'Company website');
+    const fromGeoapify = lead.company_emails.find((item) => item.source_name === 'Geoapify');
+    return (fromWebsite ?? fromGeoapify)?.email ?? null;
+};
+
 // Add a company email once, unless it already belongs to one of the lead's people
 export const addCompanyEmail = (lead, entry) => {
     if (lead.company_emails.length >= MAX_COMPANY_EMAILS) return;
