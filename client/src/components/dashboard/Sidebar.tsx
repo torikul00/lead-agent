@@ -1,11 +1,12 @@
 import { useEffect } from 'react'
 import { NavLink } from 'react-router'
-import { Inbox, List, Mail, Radar, Search, Settings, Tag, X } from 'lucide-react'
+import { Inbox, List, Mail, Radar, Search, Settings, Tag, Users, X } from 'lucide-react'
 import socket from '@/lib/socket.ts'
 import useInboxStore from '@/store/inbox.store.ts'
 
 const navItems = [
     { to: '/search-leads', label: 'Search leads', icon: Search },
+    { to: '/leads', label: 'Leads', icon: Users },
     { to: '/lead-lists', label: 'Lead lists', icon: List },
     { to: '/inbox', label: 'Inbox', icon: Inbox },
     { to: '/email-templates', label: 'Email templates', icon: Mail },

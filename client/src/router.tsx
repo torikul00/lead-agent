@@ -4,6 +4,7 @@ import GuestRoute from '@/components/GuestRoute.tsx'
 import DashboardLayout from '@/layouts/DashboardLayout.tsx'
 import Profile from '@/pages/Profile.tsx'
 import SearchLeads from '@/pages/SearchLeads.tsx'
+import Leads from '@/pages/Leads.tsx'
 import LeadLists from '@/pages/LeadLists.tsx'
 import LeadListDetails from '@/pages/LeadListDetails.tsx'
 import EmailTemplates from '@/pages/EmailTemplates.tsx'
@@ -22,6 +23,7 @@ export default function AppRouter() {
                     <Route element={<DashboardLayout />}>
                         <Route path="/" element={<Navigate to="/search-leads" replace />} />
                         <Route path="/search-leads" element={<SearchLeads />} />
+                        <Route path="/leads" element={<Leads />} />
                         <Route path="/lead-lists" element={<LeadLists />} />
                         <Route path="/lead-lists/:id" element={<LeadListDetails />} />
                         <Route path="/email-templates" element={<EmailTemplates />} />

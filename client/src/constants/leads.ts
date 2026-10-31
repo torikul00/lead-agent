@@ -39,3 +39,6 @@ export const SCORE_BARS: Record<FitLabel, string> = {
     needs_review: 'bg-amber-400',
     poor_fit: 'bg-slate-400',
 }
+
+// Columns of the leads CSV, in the order exportLeadsCsv.ts writes them
+export const LEAD_CSV_COLUMNS = ['Company', 'Website', 'Domain', 'Industry', 'Employees', 'Location', 'Country', 'Contacts', 'Emails', 'Phone', 'Description', 'Mail server', 'Email provider', 'Score', 'Fit', 'Score reasons', 'Source', 'Source URL']

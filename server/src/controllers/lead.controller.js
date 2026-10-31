@@ -2,12 +2,14 @@
 import Lead from '../models/lead.model.js';
 import LeadList from '../models/leadList.model.js';
 import Category from '../models/category.model.js';
+import Conversation from '../models/conversation.model.js';
+import EmailMessage from '../models/emailMessage.model.js';
 import { SOURCES } from '../sources/index.js';
 import { ENRICHERS } from '../enrichers/index.js';
 import hunter from '../enrichers/hunter.enricher.js';
 import { searchCities } from '../sources/geoapify.source.js';
-import { MAX_COMPANY_EMAILS, SHORTLIST_SIZE } from '../../utils/constants.js';
-import { checkMx, countEmails, dedupeLeads, normalizeDomain, rankLeads } from '../../utils/helper.js';
+import { LEADS_PAGE_SIZE, MAX_COMPANY_EMAILS, SHORTLIST_SIZE } from '../../utils/constants.js';
+import { checkMx, countEmails, dedupeLeads, escapeRegex, normalizeDomain, rankLeads } from '../../utils/helper.js';
 
 // POST /api/leads/generate_leads â€” find companies from the selected sources and return the top matches with their decision makers.
 export const generateLeads = async (req, res) => {
@@ -182,6 +184,77 @@ export const getLeadList = async (req, res) => {
     } catch (err) {
         console.error('Loading lead list failed:', err);
         return res.status(500).json({ error: 'Could not load this list right now. Please try again.' });
+    }
+};
+
+// The Leads page's search box and category filter as a lead query
+const buildLeadsQuery = async (userId, { search, category_id: categoryId }) => {
+    const query = { user_id: userId };
+
+    if (search) {
+        const pattern = { $regex: escapeRegex(String(search).trim()), $options: 'i' };
+        query.$or = [{ name: pattern }, { domain: pattern }];
+    }
+
+    if (categoryId === 'uncategorized') {
+        // Deleting a category leaves its id on the leads, so those count as uncategorized too
+        query.category_id = { $nin: await Category.distinct('_id', { user_id: userId }) };
+    } else if (categoryId && isValidObjectId(categoryId)) {
+        query.category_id = categoryId;
+    }
+
+    return query;
+};
+
+// GET /api/leads — one page of the user's leads from all lists, best score first
+export const getLeads = async (req, res) => {
+    try {
+        const query = await buildLeadsQuery(req.user._id, req.query);
+        const total = await Lead.countDocuments(query);
+        const totalPages = Math.ceil(total / LEADS_PAGE_SIZE);
+
+        // A page past the end, e.g. after its last lead left the filter, shows the last page instead
+        const requestedPage = Math.max(Number.parseInt(req.query.page, 10) || 1, 1);
+        const page = Math.min(requestedPage, totalPages || 1);
+
+        const leads = await Lead.find(query).sort({ score: -1, _id: 1 }).skip((page - 1) * LEADS_PAGE_SIZE).limit(LEADS_PAGE_SIZE).populate('category_id', 'name color').select('-user_id -lead_list_id -__v').lean();
+        const formattedLeads = leads.map((lead) => ({ ...lead, id: lead._id }));
+        return res.status(200).json({ leads: formattedLeads, total, page, total_pages: totalPages });
+    } catch (err) {
+        console.error('Loading leads failed:', err);
+        return res.status(500).json({ error: 'Could not load your leads right now. Please try again.' });
+    }
+};
+
+// GET /api/leads/export — every lead matching the search and category filter, not only the page on screen
+export const exportLeads = async (req, res) => {
+    try {
+        const query = await buildLeadsQuery(req.user._id, req.query);
+        const leads = await Lead.find(query).sort({ score: -1, _id: 1 }).select('-user_id -lead_list_id -__v').lean();
+        return res.status(200).json({ leads });
+    } catch (err) {
+        console.error('Exporting leads failed:', err);
+        return res.status(500).json({ error: 'Could not export your leads right now. Please try again.' });
+    }
+};
+
+// DELETE /api/leads/:id — remove a lead with its conversations and their emails from LeadAgent; the mailbox itself isn't touched
+export const deleteLead = async (req, res) => {
+    try {
+        const lead = isValidObjectId(req.params.id) && await Lead.findOne({ _id: req.params.id, user_id: req.user._id }).lean();
+        if (!lead) return res.status(404).json({ error: 'Lead not found.' });
+
+        // The lead goes last, so a failed delete can be tried again without leaving conversations behind
+        const conversationIds = await Conversation.distinct('_id', { user_id: req.user._id, lead_id: lead._id });
+        await EmailMessage.deleteMany({ conversation_id: { $in: conversationIds } });
+        await Conversation.deleteMany({ _id: { $in: conversationIds } });
+        await Lead.deleteOne({ _id: lead._id });
+        await LeadList.updateOne({ _id: lead.lead_list_id }, { $inc: { lead_count: -1 } });
+
+        return res.status(200).json({ message: 'Lead deleted.' });
+    } catch (err) {
+        console.error('Deleting lead failed:', err);
+        return res.status(500).json({ error: 'Could not delete the lead right now. Please try again.' });
     }
 };
 

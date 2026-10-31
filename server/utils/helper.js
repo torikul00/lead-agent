@@ -180,6 +180,9 @@ export const countEmails = (lead) => lead.company_emails.length + lead.contacts.
 
 export const escapeHtml = (text) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
+// Lets text typed by a user be matched literally inside a regular expression
+export const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 // Plain-text preview of an email body for the Inbox list; styles and the head of a full HTML email are dropped first
 export const toSnippet = (html) => html.replace(/<(head|style|script)[\s\S]*?<\/\1>/gi, ' ').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
 

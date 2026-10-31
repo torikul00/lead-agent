@@ -3,6 +3,9 @@ export const DEFAULT_LEADS = 10;
 export const MAX_LEADS = 50;
 export const SHORTLIST_SIZE = 20;
 
+// Leads page: how many leads one page shows
+export const LEADS_PAGE_SIZE = 25;
+
 // A stored MX result is reused for this many days before the domain is looked up again
 export const MX_CACHE_DAYS = 30;
 

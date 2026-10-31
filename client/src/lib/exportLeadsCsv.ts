@@ -1,3 +1,4 @@
+import { LEAD_CSV_COLUMNS } from '@/constants/leads.ts'
 import type { Lead } from '@/types/index.ts'
 
 // Quote every value and stop spreadsheets from treating cell text as a formula
@@ -8,7 +9,6 @@ const toCell = (value: string | number | null) => {
 }
 
 export default function exportLeadsCsv(leads: Lead[]) {
-    const header = ['Company', 'Website', 'Domain', 'Industry', 'Employees', 'Location', 'Country', 'Contacts', 'Emails', 'Phone', 'Description', 'Mail server', 'Email provider', 'Score', 'Fit', 'Score reasons', 'Source', 'Source URL']
     const rows = leads.map((lead) => [
         lead.name,
         lead.website,
@@ -32,7 +32,7 @@ export default function exportLeadsCsv(leads: Lead[]) {
     ])
 
     // The BOM makes Excel read the file as UTF-8
-    const csv = '﻿' + [header, ...rows].map((row) => row.map(toCell).join(',')).join('\r\n')
+    const csv = '﻿' + [LEAD_CSV_COLUMNS, ...rows].map((row) => row.map(toCell).join(',')).join('\r\n')
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
 
     const link = document.createElement('a')

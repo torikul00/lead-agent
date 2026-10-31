@@ -1,5 +1,5 @@
-import { Fragment, useState, type SyntheticEvent } from 'react'
-import { Check, Copy, ExternalLink, LoaderCircle, Mail, MailCheck, Phone, Send } from 'lucide-react'
+import { Fragment, useEffect, useRef, useState, type CSSProperties, type SyntheticEvent } from 'react'
+import { Check, Copy, EllipsisVertical, ExternalLink, Eye, LoaderCircle, Mail, MailCheck, Phone, Send, Trash2 } from 'lucide-react'
 import Select from 'react-select'
 import api from '@/lib/axios.ts'
 import getErrorMessage from '@/lib/getErrorMessage.ts'
@@ -13,7 +13,7 @@ type CategoryOption = {
 }
 
 const categorySelectClassNames = {
-    control: ({ isFocused }: { isFocused: boolean }) => `min-h-9 min-w-40 cursor-pointer rounded-lg border bg-white px-2 text-xs transition ${isFocused ? 'border-primary ring-4 ring-primary/15' : 'border-slate-200 hover:border-slate-300'}`,
+    control: ({ isFocused }: { isFocused: boolean }) => `min-h-9 min-w-52 cursor-pointer rounded-lg border bg-white px-2 text-xs transition ${isFocused ? 'border-primary ring-4 ring-primary/15' : 'border-slate-200 hover:border-slate-300'}`,
     valueContainer: () => 'px-1',
     singleValue: () => 'text-slate-700',
     input: () => 'text-slate-700',
@@ -121,6 +121,75 @@ function FindEmailsButton({ lead, onUpdate }: { lead: Lead; onUpdate: (lead: Lea
     )
 }
 
+const ACTIONS_MENU_HEIGHT = 96
+
+// A row's ⋮ menu; it's fixed to the screen, because the table's scroll area would cut it off on the last rows
+function LeadActionsMenu({ name, onView, onDelete }: { name: string; onView: () => void; onDelete: () => void }) {
+    const [position, setPosition] = useState<CSSProperties | null>(null)
+    const menuRef = useRef<HTMLDivElement>(null)
+
+    // A click outside closes the menu, and so does scrolling, since the menu wouldn't follow its row
+    useEffect(() => {
+        if (!position) return
+
+        const close = () => setPosition(null)
+        const handleClickOutside = (e: MouseEvent) => {
+            if (!menuRef.current?.contains(e.target as Node)) close()
+        }
+
+        document.addEventListener('mousedown', handleClickOutside)
+        window.addEventListener('scroll', close, true)
+        window.addEventListener('resize', close)
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside)
+            window.removeEventListener('scroll', close, true)
+            window.removeEventListener('resize', close)
+        }
+    }, [position])
+
+    const toggle = (event: SyntheticEvent<HTMLButtonElement>) => {
+        if (position) {
+            setPosition(null)
+            return
+        }
+
+        const button = event.currentTarget.getBoundingClientRect()
+        const { clientWidth, clientHeight } = document.documentElement
+        // Near the bottom of the screen it opens upwards
+        const vertical = clientHeight - button.bottom < ACTIONS_MENU_HEIGHT ? { bottom: clientHeight - button.top + 4 } : { top: button.bottom + 4 }
+        setPosition({ ...vertical, right: clientWidth - button.right })
+    }
+
+    const choose = (action: () => void) => {
+        setPosition(null)
+        action()
+    }
+
+    return (
+        <div ref={menuRef} className="inline-block">
+            <button type="button" onClick={toggle} aria-label={`Actions for ${name}`} aria-expanded={Boolean(position)} className="cursor-pointer rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700">
+                <EllipsisVertical className="size-5" />
+            </button>
+
+            {position && (
+                <div style={position} className="fixed z-30 w-36 overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 text-left shadow-lg">
+                    <button type="button" onClick={() => choose(onView)} className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-100">
+                        <Eye className="size-4" />
+                        View
+                    </button>
+                    <button type="button" onClick={() => choose(onDelete)} className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-red-600 transition hover:bg-red-50">
+                        <Trash2 className="size-4" />
+                        Delete
+                    </button>
+                </div>
+            )}
+        </div>
+    )
+}
+
+// Saved leads use their id, since the same company can be in two lists
+const leadKey = (lead: Lead) => lead.id ?? lead.domain ?? lead.name
+
 // Selecting rows and finding emails are optional, so a saved list can show the table read-only
 type LeadsTableProps = {
     leads: Lead[]
@@ -131,13 +200,19 @@ type LeadsTableProps = {
     onCategoryChange?: (lead: Lead, categoryId: string | null) => Promise<void>
     onSendEmail?: (lead: Lead) => void
     onOpenLead?: (lead: Lead) => void
+    onDeleteLead?: (lead: Lead) => void
+    // A click on the row opens the lead's details instead of expanding the row
+    rowOpensLead?: boolean
 }
 
-export default function LeadsTable({ leads, selected = [], onSelectedChange, onLeadUpdate, categories = [], onCategoryChange, onSendEmail, onOpenLead }: LeadsTableProps) {
+export default function LeadsTable({ leads, selected = [], onSelectedChange, onLeadUpdate, categories = [], onCategoryChange, onSendEmail, onOpenLead, onDeleteLead, rowOpensLead = false }: LeadsTableProps) {
     const [openRow, setOpenRow] = useState<string | null>(null)
-    const allSelected = leads.length > 0 && selected.length === leads.length
+    const keys = leads.map(leadKey)
+    const allSelected = keys.length > 0 && keys.every((key) => selected.includes(key))
+    const someSelected = keys.some((key) => selected.includes(key))
 
-    const toggleAll = () => onSelectedChange?.(allSelected ? [] : leads.map((lead) => lead.domain ?? lead.name))
+    // Leads selected on other pages stay selected
+    const toggleAll = () => onSelectedChange?.(allSelected ? selected.filter((key) => !keys.includes(key)) : [...new Set([...selected, ...keys])])
 
     return (
         <div className="overflow-x-auto">
@@ -150,7 +225,7 @@ export default function LeadsTable({ leads, selected = [], onSelectedChange, onL
                                     type="checkbox"
                                     checked={allSelected}
                                     ref={(el) => {
-                                        if (el) el.indeterminate = selected.length > 0 && !allSelected
+                                        if (el) el.indeterminate = someSelected && !allSelected
                                     }}
                                     onChange={toggleAll}
                                     aria-label="Select all companies"
@@ -167,18 +242,19 @@ export default function LeadsTable({ leads, selected = [], onSelectedChange, onL
                         <th className="px-4 py-3">Mail server</th>
                         <th className="py-3 pr-6 pl-4">Score</th>
                         {onSendEmail && <th className="py-3 pr-6 pl-2"><span className="sr-only">Send email</span></th>}
+                        {onDeleteLead && <th className="py-3 pr-6 pl-4 text-right">Actions</th>}
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                     {leads.map((lead) => {
-                        const key = lead.domain ?? lead.name
+                        const key = leadKey(lead)
                         const open = openRow === key
                         const checked = selected.includes(key)
                         const fit = FIT_LABELS[lead.fit_label]
                         const mx = MX_LABELS[lead.mx_status]
                         const [firstContact] = lead.contacts
                         const emailCount = lead.company_emails.length + lead.contacts.filter((contact) => contact.email).length
-                        const toggle = () => setOpenRow(open ? null : key)
+                        const toggle = () => (rowOpensLead ? onOpenLead?.(lead) : setOpenRow(open ? null : key))
                         const assignedCategory = typeof lead.category_id === 'object' && lead.category_id ? lead.category_id._id : lead.category_id
                         const categoryOptions: CategoryOption[] = [
                             { value: '', label: 'Uncategorized', color: '#94a3b8' },
@@ -213,7 +289,7 @@ export default function LeadsTable({ leads, selected = [], onSelectedChange, onL
                                         toggle()
                                     }}
                                     tabIndex={0}
-                                    aria-expanded={open}
+                                    aria-expanded={rowOpensLead ? undefined : open}
                                     className={`cursor-pointer transition outline-none hover:bg-slate-50/80 focus-visible:bg-slate-100 ${open ? 'bg-slate-50/80' : ''}`}
                                 >
                                     {onSelectedChange && (
@@ -326,11 +402,16 @@ export default function LeadsTable({ leads, selected = [], onSelectedChange, onL
                                             </button>
                                         </td>
                                     )}
+                                    {onDeleteLead && (
+                                        <td className="py-4 pr-6 pl-4 text-right" onClick={(e) => e.stopPropagation()}>
+                                            <LeadActionsMenu name={lead.name} onView={() => onOpenLead?.(lead)} onDelete={() => onDeleteLead(lead)} />
+                                        </td>
+                                    )}
                                 </tr>
 
                                 {open && (
                                     <tr className="bg-slate-50/80">
-                                        <td colSpan={(onSelectedChange ? 8 : 7) + (onCategoryChange ? 1 : 0) + (onSendEmail ? 1 : 0)} className="px-6 pb-4">
+                                        <td colSpan={(onSelectedChange ? 8 : 7) + (onCategoryChange ? 1 : 0) + (onSendEmail ? 1 : 0) + (onDeleteLead ? 1 : 0)} className="px-6 pb-4">
                                             <div className="grid grid-cols-[1fr_2fr_1fr] gap-6 rounded-xl border border-slate-200 bg-white p-4">
                                                 <div>
                                                     <h3 className="text-xs font-medium tracking-wide text-slate-500 uppercase">About</h3>
