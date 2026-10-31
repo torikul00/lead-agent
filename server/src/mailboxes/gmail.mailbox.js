@@ -130,7 +130,7 @@ export default {
             email.references = [header('references'), header('message-id')].filter(Boolean).join(' ');
         }
 
-        const { message } = await mailBuilder.sendMail(email);
+        const { message, messageId } = await mailBuilder.sendMail(email);
 
         const sent = await readResponse(await fetch(`${API_URL}/users/me/messages/send`, {
             method: 'POST',
@@ -139,7 +139,7 @@ export default {
             signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         }));
 
-        return { message_id: sent.id, thread_id: sent.threadId };
+        return { message_id: sent.id, thread_id: sent.threadId, internet_message_id: messageId };
     },
 
     // Ids and threads of every email since the given time, sent ones included
@@ -176,6 +176,9 @@ export default {
         return {
             id: message.id,
             thread_id: message.threadId,
+            internet_message_id: header('message-id'),
+            // A reply is also matched by these, in case Gmail ever puts it in a different threadId than the email it's answering
+            in_reply_to_ids: `${header('references')} ${header('in-reply-to')}`.match(/<[^<>]+>/g) ?? [],
             from: toAddress(header('from')),
             to: toAddress(header('to')),
             subject: header('subject'),

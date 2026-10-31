@@ -106,6 +106,7 @@ export type Conversation = {
     phone: string | null
     category_id: string | null
     lead_email: string
+    provider: MailboxProvider
     subject: string
     snippet: string
     last_message_at: string

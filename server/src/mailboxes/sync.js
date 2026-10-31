@@ -23,16 +23,31 @@ const checkMailbox = async (mailbox) => {
         ? new Date(mailbox.last_synced_at.getTime() - LOOK_BACK_MS)
         : new Date(Math.min(...conversations.map((conversation) => conversation.createdAt.getTime())));
 
+    const conversationIds = conversations.map((conversation) => conversation._id);
     const byThread = new Map(conversations.map((conversation) => [conversation.thread_id, conversation]));
+    const byId = new Map(conversations.map((conversation) => [String(conversation._id), conversation]));
+
+    // A reply's References/In-Reply-To header points at one of these; used when the provider puts the reply in a different thread than the email it's answering
+    const sentMessages = await EmailMessage.find({ conversation_id: { $in: conversationIds }, direction: 'sent', internet_message_id: { $ne: null } }).lean();
+    const byMessageId = new Map(sentMessages.map((message) => [message.internet_message_id, byId.get(String(message.conversation_id))]));
+
     const provider = MAILBOXES[mailbox.provider];
     const accessToken = await getAccessToken(mailbox);
     const changed = new Set();
 
     for (const { id, thread_id: threadId } of await provider.listMessages(accessToken, since)) {
-        const conversation = byThread.get(threadId);
-        if (!conversation || await EmailMessage.exists({ conversation_id: conversation._id, provider_message_id: id })) continue;
+        if (await EmailMessage.exists({ conversation_id: { $in: conversationIds }, provider_message_id: id })) continue;
 
-        const email = await provider.getMessage(accessToken, id);
+        let conversation = byThread.get(threadId);
+        let email = null;
+
+        if (!conversation) {
+            email = await provider.getMessage(accessToken, id);
+            conversation = email.in_reply_to_ids.map((messageId) => byMessageId.get(messageId)).find(Boolean);
+        }
+        if (!conversation) continue;
+
+        email ??= await provider.getMessage(accessToken, id);
         const direction = email.from === mailbox.email ? 'sent' : 'received';
 
         await EmailMessage.create({
@@ -40,6 +55,7 @@ const checkMailbox = async (mailbox) => {
             user_id: conversation.user_id,
             direction,
             provider_message_id: id,
+            internet_message_id: email.internet_message_id || null,
             from: email.from,
             to: email.to,
             subject: email.subject,

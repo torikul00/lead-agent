@@ -12,6 +12,12 @@ const conversationSchema = new Schema({
         ref: 'Mailbox',
         required: true,
     },
+    // Copied from the mailbox, so the Inbox can show the provider icon without a lookup
+    provider: {
+        type: String,
+        enum: ['gmail', 'outlook'],
+        required: true,
+    },
     lead_id: {
         type: Schema.Types.ObjectId,
         ref: 'Lead',

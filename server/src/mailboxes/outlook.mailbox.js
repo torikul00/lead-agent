@@ -109,7 +109,7 @@ export default {
             signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         }));
 
-        return { message_id: draft.id, thread_id: draft.conversationId };
+        return { message_id: draft.id, thread_id: draft.conversationId, internet_message_id: draft.internetMessageId };
     },
 
     // Ids and conversations of every email since the given time, sent ones included; drafts are skipped
@@ -131,14 +131,20 @@ export default {
 
     // One email with its sender, subject and body as HTML
     async getMessage(accessToken, id) {
-        const message = await readResponse(await fetch(`${API_URL}/me/messages/${id}?$select=id,conversationId,from,toRecipients,subject,body,sentDateTime,receivedDateTime`, {
+        const message = await readResponse(await fetch(`${API_URL}/me/messages/${id}?$select=id,conversationId,internetMessageId,internetMessageHeaders,from,toRecipients,subject,body,sentDateTime,receivedDateTime`, {
             headers: { Authorization: `Bearer ${accessToken}`, Prefer: 'IdType="ImmutableId", outlook.body-content-type="html"' },
             signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         }));
 
+        // Exchange can put a reply in a different conversationId than the email it's answering, so replies are also matched by these
+        const header = (name) => message.internetMessageHeaders?.find((item) => item.name.toLowerCase() === name)?.value ?? '';
+        const inReplyToIds = `${header('references')} ${header('in-reply-to')}`.match(/<[^<>]+>/g) ?? [];
+
         return {
             id: message.id,
             thread_id: message.conversationId,
+            internet_message_id: message.internetMessageId ?? '',
+            in_reply_to_ids: inReplyToIds,
             from: message.from?.emailAddress?.address?.toLowerCase() ?? '',
             to: message.toRecipients?.[0]?.emailAddress?.address?.toLowerCase() ?? '',
             subject: message.subject ?? '',

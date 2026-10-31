@@ -22,6 +22,11 @@ const emailMessageSchema = new Schema({
         type: String,
         required: true,
     },
+    // RFC Message-ID header; matches a reply to its conversation when the provider's own thread id doesn't
+    internet_message_id: {
+        type: String,
+        default: null,
+    },
     // Emails that arrive can leave any of these empty
     from: {
         type: String,

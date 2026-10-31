@@ -6,9 +6,10 @@ import getErrorMessage from '@/lib/getErrorMessage.ts'
 import useInboxStore from '@/store/inbox.store.ts'
 import FormAlert from '@/components/FormAlert.tsx'
 import ConfirmationModal from '@/components/ConfirmationModal.tsx'
+import MailboxProviderIcon from '@/components/MailboxProviderIcon.tsx'
 import RichTextEditor from '@/components/emailTemplates/RichTextEditor.tsx'
 import CategorySelect from '@/components/categories/CategorySelect.tsx'
-import type { Category, Conversation, EmailMessage } from '@/types/index.ts'
+import type { Category, Conversation, EmailMessage, MailboxProvider } from '@/types/index.ts'
 
 type Thread = {
     conversation: Conversation
@@ -23,19 +24,20 @@ const formatListTime = (value: string) => {
         : date.toLocaleDateString(undefined, { dateStyle: 'medium' })
 }
 
-// The company's favicon, or its first letter when there's no domain
-function LeadAvatar({ name, domain }: { name: string; domain: string | null }) {
-    if (domain) {
-        return (
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white">
-                <img src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`} alt={`${name} favicon`} width={32} height={32} className="rounded" />
-            </div>
-        )
-    }
-
+// The company's favicon, or its first letter when there's no domain; the corner badge shows which mailbox the conversation is through
+function LeadAvatar({ name, domain, provider }: { name: string; domain: string | null; provider: MailboxProvider }) {
     return (
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 font-semibold text-primary">
-            {name.charAt(0).toUpperCase()}
+        <div className="relative shrink-0">
+            {domain ? (
+                <div className="flex size-10 items-center justify-center rounded-xl border border-slate-200 bg-white">
+                    <img src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`} alt={`${name} favicon`} width={32} height={32} className="rounded" />
+                </div>
+            ) : (
+                <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 font-semibold text-primary">
+                    {name.charAt(0).toUpperCase()}
+                </div>
+            )}
+            <MailboxProviderIcon provider={provider} className="absolute -right-1 -bottom-1 size-4 rounded-full bg-white ring-2 ring-white" />
         </div>
     )
 }
@@ -360,7 +362,7 @@ export default function Inbox() {
                                     onClick={() => openConversation(conversation.id)}
                                     className={`flex w-full cursor-pointer items-center gap-3 px-5 py-4 text-left transition hover:bg-slate-50 ${selectedId === conversation.id ? 'bg-primary/5' : ''}`}
                                 >
-                                    <LeadAvatar name={conversation.lead_name} domain={conversation.domain} />
+                                    <LeadAvatar name={conversation.lead_name} domain={conversation.domain} provider={conversation.provider} />
                                     <div className="min-w-0 flex-1">
                                         <div className="flex items-center justify-between gap-2">
                                             <span className={`truncate text-sm ${conversation.is_read ? 'font-medium text-slate-700' : 'font-semibold text-slate-900'}`}>
@@ -402,7 +404,7 @@ export default function Inbox() {
                     {thread && (
                         <>
                             <div className="flex items-center gap-3 border-b border-slate-200 px-6 py-4">
-                                <LeadAvatar name={thread.conversation.lead_name} domain={thread.conversation.domain} />
+                                <LeadAvatar name={thread.conversation.lead_name} domain={thread.conversation.domain} provider={thread.conversation.provider} />
                                 <div className="min-w-0 flex-1">
                                     <h2 className="truncate font-semibold text-slate-900">{thread.conversation.lead_name}</h2>
                                     <div className="mt-0.5 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-500">
