@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router'
-import { LoaderCircle, Mail, Plus, RefreshCw, Unplug } from 'lucide-react'
+import { LoaderCircle, RefreshCw, Unplug } from 'lucide-react'
 import api from '@/lib/axios.ts'
 import getErrorMessage from '@/lib/getErrorMessage.ts'
 import FormAlert from '@/components/FormAlert.tsx'
+import MailboxProviderIcon from '@/components/MailboxProviderIcon.tsx'
 import { MAILBOX_PROVIDERS } from '@/constants/emails.ts'
 import type { Mailbox, MailboxProvider } from '@/types/index.ts'
 
@@ -92,9 +93,13 @@ export default function Settings() {
                                 disabled={busy !== null}
                                 className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 text-left transition hover:border-primary/40 hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-60"
                             >
-                                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                                    {busy === key ? <LoaderCircle className="size-5 animate-spin" /> : <Plus className="size-5" />}
-                                </div>
+                                {busy === key ? (
+                                    <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                                        <LoaderCircle className="size-5 animate-spin" />
+                                    </div>
+                                ) : (
+                                    <MailboxProviderIcon provider={key} className="size-10 shrink-0" />
+                                )}
                                 <div className="min-w-0">
                                     <p className="font-medium text-slate-900">Connect {label}</p>
                                     <p className="text-xs text-slate-500">{description}</p>
@@ -122,7 +127,7 @@ export default function Settings() {
                                 return (
                                     <li key={mailbox.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
                                         <div className="flex min-w-0 items-center gap-3">
-                                            <Mail className="size-5 shrink-0 text-slate-400" />
+                                            <MailboxProviderIcon provider={mailbox.provider} className="size-8 shrink-0" />
                                             <div className="min-w-0">
                                                 <p className="truncate font-medium text-slate-900">{mailbox.email}</p>
                                                 <p className="text-xs text-slate-500">{provider?.label}</p>
