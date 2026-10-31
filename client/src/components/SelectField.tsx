@@ -5,6 +5,8 @@ export type SelectOption = {
     value: string
     label: string
     icon?: LucideIcon
+    // Shown as a dot before the label, for categories
+    color?: string
 }
 
 type SelectFieldProps = {
@@ -58,9 +60,10 @@ export default function SelectField({ id, label, options, value, onChange, place
                 placeholder={placeholder}
                 isSearchable={searchable}
                 menuPlacement="auto"
-                formatOptionLabel={({ label: optionLabel, icon: Icon }) => (
+                formatOptionLabel={({ label: optionLabel, icon: Icon, color }) => (
                     <span className="flex items-center gap-2.5">
                         {Icon && <Icon className="size-4 shrink-0 text-primary" />}
+                        {color && <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />}
                         {optionLabel}
                     </span>
                 )}

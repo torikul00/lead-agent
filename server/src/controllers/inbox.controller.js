@@ -1,30 +1,15 @@
 import { isValidObjectId } from 'mongoose';
 import Mailbox from '../models/mailbox.model.js';
 import Lead from '../models/lead.model.js';
+import LeadList from '../models/leadList.model.js';
+import Category from '../models/category.model.js';
 import EmailTemplate from '../models/emailTemplate.model.js';
 import Conversation from '../models/conversation.model.js';
 import EmailMessage from '../models/emailMessage.model.js';
 import { sendFromMailbox } from '../mailboxes/index.js';
+import { getMailSendReport, sendTemplateToLead, startMailSend } from '../mailboxes/mailSender.js';
 import { syncUserMailboxes } from '../mailboxes/sync.js';
-import { TEMPLATE_VARIANT_KEYS } from '../../utils/constants.js';
-import { chooseLeadEmail, escapeHtml, toSnippet } from '../../utils/helper.js';
-
-const PLACEHOLDER = /\{\{(\w+)\}\}/g;
-
-// The template's version for the lead's email provider ("Microsoft 365" -> microsoft_365), with {{placeholders}} filled in; company addresses have no contact name
-const fillTemplate = (template, lead) => {
-    const key = lead.email_provider?.toLowerCase().replace(/ /g, '_');
-    const content = template.variants?.[TEMPLATE_VARIANT_KEYS.includes(key) ? key : 'other'] ?? template;
-    const values = { companyName: lead.name, contactName: '', domain: lead.domain ?? '' };
-
-    // Unknown placeholders stay as they are; values going into the HTML body are escaped
-    const fill = (text, escape) => text.replace(PLACEHOLDER, (match, name) => {
-        if (!Object.hasOwn(values, name)) return match;
-        return escape ? escapeHtml(values[name]) : values[name];
-    });
-
-    return { subject: fill(content.subject, false), body: fill(content.body, true) };
-};
+import { toSnippet } from '../../utils/helper.js';
 
 // Lead details the Inbox shows with a conversation
 const LEAD_FIELDS = 'name domain phone category_id';
@@ -203,56 +188,17 @@ export const sendBulkEmailToLead = async (req, res) => {
 
         const leads = await Lead.find({ _id: { $in: leadIds }, user_id: req.user._id }).lean();
 
-        // Leads that weren't found or have no email are skipped; the names show the user who didn't get the email
-        const result = { sent: 0, skipped: leadIds.length - leads.length, failed: 0, skipped_leads: [], failed_leads: [] };
+        // Leads that weren't found or have no email are skipped
+        const result = { sent: 0, skipped: leadIds.length - leads.length, failed: 0 };
 
         // One at a time, so a big batch doesn't run into the provider's rate limits
         for (const lead of leads) {
-            const email = chooseLeadEmail(lead);
-            if (!email) {
-                result.skipped++;
-                result.skipped_leads.push(lead.name);
-                continue;
-            }
-
-            const { subject, body } = fillTemplate(template, lead);
-
             try {
-                const sent = await sendFromMailbox(mailbox, { to: email, subject, html: body });
-                const sentAt = new Date();
-
-                const conversation = await Conversation.create({
-                    user_id: req.user._id,
-                    mailbox_id: mailbox._id,
-                    provider: mailbox.provider,
-                    lead_id: lead._id,
-                    lead_name: lead.name,
-                    lead_email: email,
-                    subject,
-                    thread_id: sent.thread_id,
-                    snippet: toSnippet(body),
-                    last_message_at: sentAt,
-                });
-
-                await EmailMessage.create({
-                    conversation_id: conversation._id,
-                    user_id: req.user._id,
-                    direction: 'sent',
-                    provider_message_id: sent.message_id,
-                    internet_message_id: sent.internet_message_id || null,
-                    from: mailbox.email,
-                    to: email,
-                    subject,
-                    body,
-                    sent_at: sentAt,
-                });
-
-                await Lead.updateOne({ _id: lead._id }, { is_mail_sent: true });
-                result.sent++;
+                if (await sendTemplateToLead(mailbox, template, lead)) result.sent++;
+                else result.skipped++;
             } catch (err) {
                 console.error(`Emailing lead ${lead._id} failed:`, err);
                 result.failed++;
-                result.failed_leads.push(lead.name);
 
                 // The mailbox's login stopped working, so the other emails would fail too
                 if (mailbox.status === 'disconnected') break;
@@ -267,5 +213,58 @@ export const sendBulkEmailToLead = async (req, res) => {
     } catch (err) {
         console.error('Sending bulk email failed:', err);
         return res.status(500).json({ error: 'Could not send the emails right now. Please try again.' });
+    }
+};
+
+// POST /api/emails/send_list — start emailing a template to every lead in a list; it runs in the background, so it keeps going if the user leaves the page
+export const sendLeadList = async (req, res) => {
+    try {
+        const { lead_list_id: listId, mailbox_id: mailboxId, template_id: templateId, category_id: categoryId } = req.body;
+
+        const list = await LeadList.findOne({ _id: listId, user_id: req.user._id }).lean();
+        if (!list) {
+            return res.status(404).json({ error: 'List not found.' });
+        }
+
+        const mailbox = await Mailbox.findOne({ _id: mailboxId, user_id: req.user._id }).lean();
+        if (!mailbox) {
+            return res.status(404).json({ error: 'Mailbox not found.' });
+        }
+        if (mailbox.status !== 'connected') {
+            return res.status(400).json({ error: 'This mailbox is disconnected. Connect it again in Settings.' });
+        }
+
+        if (!await EmailTemplate.exists({ _id: templateId, user_id: req.user._id })) {
+            return res.status(404).json({ error: 'Template not found.' });
+        }
+
+        if (categoryId && !await Category.exists({ _id: categoryId, user_id: req.user._id })) {
+            return res.status(404).json({ error: 'Category not found.' });
+        }
+
+        const leads = await Lead.find({ lead_list_ids: list._id }).sort({ score: -1, _id: 1 }).select('_id').lean();
+        if (!leads.length) {
+            return res.status(400).json({ error: 'This list has no leads.' });
+        }
+
+        const report = await startMailSend({ userId: String(req.user._id), mailboxId, templateId, categoryId, leadIds: leads.map((lead) => String(lead._id)) });
+        if (!report) {
+            return res.status(409).json({ error: 'Your last send is still running. Wait for it to finish.' });
+        }
+
+        return res.status(202).json({ report });
+    } catch (err) {
+        console.error('Starting list send failed:', err);
+        return res.status(500).json({ error: 'Could not start sending right now. Please try again.' });
+    }
+};
+
+// GET /api/emails/send_list — the report of the user's latest send, so the Mail Sender page can pick it up after a refresh
+export const getSendReport = async (req, res) => {
+    try {
+        return res.status(200).json({ report: await getMailSendReport(req.user._id) });
+    } catch (err) {
+        console.error('Loading send report failed:', err);
+        return res.status(500).json({ error: 'Could not load the send report right now.' });
     }
 };

@@ -36,3 +36,12 @@ export const sendBulkEmailSchema = z.object({
         .max(MAX_LEADS, `You can email up to ${MAX_LEADS} leads at a time`)
         .transform((ids) => [...new Set(ids)]),
 });
+
+// One template sent from one of the user's mailboxes to every lead in a list
+export const sendListSchema = z.object({
+    lead_list_id: objectId('Choose a lead list'),
+    mailbox_id: objectId('Choose a mailbox to send from'),
+    template_id: objectId('Choose a template'),
+    // Optional: the category a lead moves to once its email is sent
+    category_id: objectId('Invalid category').nullable().default(null),
+});

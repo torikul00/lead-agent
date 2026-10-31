@@ -29,6 +29,10 @@ export const COUNTRY_CODES = {
 // How often connected mailboxes are checked for lead replies
 export const MAILBOX_SYNC_MINUTES = 2;
 
+// Mail Sender: how many users' sends run at once, and how many server restarts one send can carry on from
+export const MAIL_SEND_CONCURRENCY = 3;
+export const MAIL_SEND_MAX_RESTARTS = 10;
+
 // Contact finding: how many company websites are read at once, and the most people and emails kept per lead
 export const ENRICH_CONCURRENCY = 8;
 export const MAX_CONTACTS = 10;

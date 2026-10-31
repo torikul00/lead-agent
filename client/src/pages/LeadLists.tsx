@@ -85,11 +85,10 @@ export default function LeadLists() {
                                                     <Eye className="size-3.5" />
                                                     View leads
                                                 </Link>
-                                                {/* Placeholder until sending emails is built */}
-                                                <button type="button" disabled title="Coming soon" className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-400">
+                                                <Link to={`/mail-sender?list=${list.id}`} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">
                                                     <Send className="size-3.5" />
                                                     Send email
-                                                </button>
+                                                </Link>
                                                 <button
                                                     type="button"
                                                     onClick={() => setDeletingList(list)}

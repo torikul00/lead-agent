@@ -12,6 +12,7 @@ import leadRoutes from './src/routes/lead.routes.js';
 import emailRoutes from './src/routes/email.routes.js';
 import categoryRoutes from './src/routes/category.routes.js';
 import { startMailboxSync } from './src/mailboxes/sync.js';
+import { startMailSender } from './src/mailboxes/mailSender.js';
 
 connectDB();
 
@@ -77,3 +78,6 @@ httpServer.listen(PORT, () => {
 
 // Look for lead replies in the connected mailboxes
 startMailboxSync();
+
+// Send queued emails in the background, so they keep going when the user leaves the page
+startMailSender();

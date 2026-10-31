@@ -54,6 +54,12 @@ export function notifyInboxUpdated(userId, conversationIds) {
     io.to(userRoom(userId)).emit('inbox_updated', { conversation_ids: conversationIds });
 }
 
+// The user's mail send moved on, for the live report on the Mail Sender page
+export function notifyMailSendUpdated(userId, report) {
+    if (!io) return;
+    io.to(userRoom(userId)).emit('mail_send_updated', report);
+}
+
 export function createHttpServer(app) {
     const httpServer = createServer(app);
     attachSocketIO(httpServer);
