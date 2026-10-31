@@ -11,6 +11,7 @@ import LeadsTable from '@/components/leads/LeadsTable.tsx'
 import LeadDetailsModal from '@/components/leads/LeadDetailsModal.tsx'
 import ExportLeadsModal from '@/components/leads/ExportLeadsModal.tsx'
 import SaveLeadListModal from '@/components/leads/SaveLeadListModal.tsx'
+import SendEmailModal from '@/components/leads/SendEmailModal.tsx'
 import type { Category, Lead } from '@/types/index.ts'
 
 type CategoryFilterOption = {
@@ -83,6 +84,7 @@ export default function Leads() {
     const [creatingList, setCreatingList] = useState(false)
     const [savedMessage, setSavedMessage] = useState('')
     const [viewingLead, setViewingLead] = useState<Lead | null>(null)
+    const [sendingTo, setSendingTo] = useState<Lead | null>(null)
     const [deletingLead, setDeletingLead] = useState<Lead | null>(null)
     const [deleteLoading, setDeleteLoading] = useState(false)
     const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
@@ -258,7 +260,7 @@ export default function Leads() {
 
             {leads.length > 0 && (
                 <section className={`overflow-hidden rounded-2xl border border-slate-200 bg-white transition ${loading ? 'opacity-60' : ''}`}>
-                    <LeadsTable leads={leads} selected={selected} onSelectedChange={setSelected} categories={categories} onCategoryChange={handleCategoryChange} onOpenLead={setViewingLead} onDeleteLead={setDeletingLead} rowOpensLead />
+                    <LeadsTable leads={leads} selected={selected} onSelectedChange={setSelected} categories={categories} onCategoryChange={handleCategoryChange} onOpenLead={setViewingLead} onSendEmail={setSendingTo} onDeleteLead={setDeletingLead} rowOpensLead />
 
                     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-6 py-3">
                         <p className="text-sm text-slate-500">{total} {total === 1 ? 'lead' : 'leads'}</p>
@@ -274,6 +276,17 @@ export default function Leads() {
                     onLeadUpdate={(updated) => {
                         setLeads((current) => current.map((item) => (item.id === updated.id ? updated : item)))
                         setViewingLead(updated)
+                    }}
+                />
+            )}
+
+            {sendingTo && (
+                <SendEmailModal
+                    lead={sendingTo}
+                    onClose={() => setSendingTo(null)}
+                    onSent={() => {
+                        setLeads((current) => current.map((item) => (item.id === sendingTo.id ? { ...item, is_mail_sent: true } : item)))
+                        setSendingTo(null)
                     }}
                 />
             )}

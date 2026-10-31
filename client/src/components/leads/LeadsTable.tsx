@@ -121,10 +121,10 @@ function FindEmailsButton({ lead, onUpdate }: { lead: Lead; onUpdate: (lead: Lea
     )
 }
 
-const ACTIONS_MENU_HEIGHT = 96
+const ACTIONS_MENU_HEIGHT = 132
 
 // A row's ⋮ menu; it's fixed to the screen, because the table's scroll area would cut it off on the last rows
-function LeadActionsMenu({ name, onView, onDelete }: { name: string; onView: () => void; onDelete: () => void }) {
+function LeadActionsMenu({ lead, onView, onSendEmail, onDelete }: { lead: Lead; onView: () => void; onSendEmail?: () => void; onDelete: () => void }) {
     const [position, setPosition] = useState<CSSProperties | null>(null)
     const menuRef = useRef<HTMLDivElement>(null)
 
@@ -167,7 +167,7 @@ function LeadActionsMenu({ name, onView, onDelete }: { name: string; onView: () 
 
     return (
         <div ref={menuRef} className="inline-block">
-            <button type="button" onClick={toggle} aria-label={`Actions for ${name}`} aria-expanded={Boolean(position)} className="cursor-pointer rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700">
+            <button type="button" onClick={toggle} aria-label={`Actions for ${lead.name}`} aria-expanded={Boolean(position)} className="cursor-pointer rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700">
                 <EllipsisVertical className="size-5" />
             </button>
 
@@ -177,6 +177,12 @@ function LeadActionsMenu({ name, onView, onDelete }: { name: string; onView: () 
                         <Eye className="size-4" />
                         View
                     </button>
+                    {onSendEmail && (
+                        <button type="button" onClick={() => choose(onSendEmail)} disabled={!lead.company_emails.length} title={lead.company_emails.length ? undefined : 'No company email'} className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40">
+                            <Send className="size-4" />
+                            Send email
+                        </button>
+                    )}
                     <button type="button" onClick={() => choose(onDelete)} className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-red-600 transition hover:bg-red-50">
                         <Trash2 className="size-4" />
                         Delete
@@ -214,6 +220,9 @@ export default function LeadsTable({ leads, selected = [], onSelectedChange, onL
     // Leads selected on other pages stay selected
     const toggleAll = () => onSelectedChange?.(allSelected ? selected.filter((key) => !keys.includes(key)) : [...new Set([...selected, ...keys])])
 
+    // With the ⋮ menu, sending an email is one of its options instead of its own column
+    const sendFromColumn = onDeleteLead ? undefined : onSendEmail
+
     return (
         <div className="overflow-x-auto">
             <table className="w-full min-w-260 text-left text-sm">
@@ -241,7 +250,7 @@ export default function LeadsTable({ leads, selected = [], onSelectedChange, onL
                         <th className="px-4 py-3">Contacts</th>
                         <th className="px-4 py-3">Mail server</th>
                         <th className="py-3 pr-6 pl-4">Score</th>
-                        {onSendEmail && <th className="py-3 pr-6 pl-2"><span className="sr-only">Send email</span></th>}
+                        {sendFromColumn && <th className="py-3 pr-6 pl-2"><span className="sr-only">Send email</span></th>}
                         {onDeleteLead && <th className="py-3 pr-6 pl-4 text-right">Actions</th>}
                     </tr>
                 </thead>
@@ -318,12 +327,19 @@ export default function LeadsTable({ leads, selected = [], onSelectedChange, onL
                                                 ) : (
                                                     <p className="truncate font-medium text-slate-900">{lead.name}</p>
                                                 )}
-                                                {lead.domain && (
-                                                    <a href={lead.website} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 text-xs text-slate-500 transition hover:text-primary">
-                                                        {lead.domain}
-                                                        <ExternalLink className="size-3" />
-                                                    </a>
-                                                )}
+                                                <div className="flex items-center gap-1.5">
+                                                    {lead.domain && (
+                                                        <a href={lead.website} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 text-xs text-slate-500 transition hover:text-primary">
+                                                            {lead.domain}
+                                                            <ExternalLink className="size-3" />
+                                                        </a>
+                                                    )}
+                                                    {lead.is_mail_sent && (
+                                                        <span title="Emailed" className="text-emerald-600">
+                                                            <MailCheck className="size-3.5" />
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     </td>
@@ -388,11 +404,11 @@ export default function LeadsTable({ leads, selected = [], onSelectedChange, onL
                                         </div>
                                         <span className={`mt-1.5 inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${fit.className}`}>{fit.label}</span>
                                     </td>
-                                    {onSendEmail && (
+                                    {sendFromColumn && (
                                         <td className="py-4 pr-6 pl-2 text-right" onClick={(e) => e.stopPropagation()}>
                                             <button
                                                 type="button"
-                                                onClick={() => onSendEmail(lead)}
+                                                onClick={() => sendFromColumn(lead)}
                                                 disabled={!lead.company_emails.length}
                                                 title={!lead.company_emails.length ? 'No company email' : lead.is_mail_sent ? 'Email sent · send again' : 'Send email'}
                                                 aria-label={`Send email to ${lead.name}`}
@@ -404,14 +420,14 @@ export default function LeadsTable({ leads, selected = [], onSelectedChange, onL
                                     )}
                                     {onDeleteLead && (
                                         <td className="py-4 pr-6 pl-4 text-right" onClick={(e) => e.stopPropagation()}>
-                                            <LeadActionsMenu name={lead.name} onView={() => onOpenLead?.(lead)} onDelete={() => onDeleteLead(lead)} />
+                                            <LeadActionsMenu lead={lead} onView={() => onOpenLead?.(lead)} onSendEmail={onSendEmail && (() => onSendEmail(lead))} onDelete={() => onDeleteLead(lead)} />
                                         </td>
                                     )}
                                 </tr>
 
                                 {open && (
                                     <tr className="bg-slate-50/80">
-                                        <td colSpan={(onSelectedChange ? 8 : 7) + (onCategoryChange ? 1 : 0) + (onSendEmail ? 1 : 0) + (onDeleteLead ? 1 : 0)} className="px-6 pb-4">
+                                        <td colSpan={(onSelectedChange ? 8 : 7) + (onCategoryChange ? 1 : 0) + (sendFromColumn ? 1 : 0) + (onDeleteLead ? 1 : 0)} className="px-6 pb-4">
                                             <div className="grid grid-cols-[1fr_2fr_1fr] gap-6 rounded-xl border border-slate-200 bg-white p-4">
                                                 <div>
                                                     <h3 className="text-xs font-medium tracking-wide text-slate-500 uppercase">About</h3>
