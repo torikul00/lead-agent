@@ -132,7 +132,15 @@ export default function SearchLeads() {
             )}
 
             {saveModalOpen && result && (
-                <SaveLeadListModal leads={chosenLeads} searchQuery={result.search_query} searchedAt={result.searched_at} onClose={() => setSaveModalOpen(false)} onSaved={handleSaved} />
+                <SaveLeadListModal
+                    title="Save leads list"
+                    description="will be saved along with your search."
+                    submitLabel="Save list"
+                    leadCount={chosenLeads.length}
+                    onSave={(name) => api.post('/leads/save_list', { name, search_query: result.search_query, searched_at: result.searched_at, leads: chosenLeads })}
+                    onClose={() => setSaveModalOpen(false)}
+                    onSaved={handleSaved}
+                />
             )}
         </div>
     )

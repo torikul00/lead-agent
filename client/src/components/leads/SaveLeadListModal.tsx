@@ -1,25 +1,26 @@
 import { useState, type SubmitEvent } from 'react'
 import { z } from 'zod'
 import { ListPlus, Tag } from 'lucide-react'
-import api from '@/lib/axios.ts'
 import getErrorMessage from '@/lib/getErrorMessage.ts'
 import InputField from '@/components/InputField.tsx'
 import FormAlert from '@/components/FormAlert.tsx'
 import SubmitButton from '@/components/SubmitButton.tsx'
-import { leadListSchema, type LeadListInput, type LeadSearchInput } from '@/schemas/lead.ts'
-import type { Lead } from '@/types/index.ts'
+import { leadListSchema, type LeadListInput } from '@/schemas/lead.ts'
 
 type LeadListErrors = Partial<Record<keyof LeadListInput, string[]>>
 
 type SaveLeadListModalProps = {
-    leads: Lead[]
-    searchQuery: LeadSearchInput
-    searchedAt: string
+    title: string
+    // Follows the number of leads, e.g. "will be saved along with your search."
+    description: string
+    submitLabel: string
+    leadCount: number
+    onSave: (name: string) => Promise<unknown>
     onClose: () => void
     onSaved: (name: string) => void
 }
 
-export default function SaveLeadListModal({ leads, searchQuery, searchedAt, onClose, onSaved }: SaveLeadListModalProps) {
+export default function SaveLeadListModal({ title, description, submitLabel, leadCount, onSave, onClose, onSaved }: SaveLeadListModalProps) {
     const [errors, setErrors] = useState<LeadListErrors>({})
     const [serverError, setServerError] = useState('')
     const [loading, setLoading] = useState(false)
@@ -38,7 +39,7 @@ export default function SaveLeadListModal({ leads, searchQuery, searchedAt, onCl
         setLoading(true)
 
         try {
-            await api.post('/leads/save_list', { name: result.data.name, search_query: searchQuery, searched_at: searchedAt, leads })
+            await onSave(result.data.name)
             onSaved(result.data.name)
         } catch (err) {
             setServerError(getErrorMessage(err))
@@ -54,9 +55,9 @@ export default function SaveLeadListModal({ leads, searchQuery, searchedAt, onCl
                     <ListPlus className="size-6" />
                 </div>
 
-                <h2 id="save-list-title" className="mt-5 text-2xl font-bold text-slate-900">Save leads list</h2>
+                <h2 id="save-list-title" className="mt-5 text-2xl font-bold text-slate-900">{title}</h2>
                 <p className="mt-2 text-sm text-slate-500">
-                    <span className="font-medium text-slate-700">{leads.length} {leads.length === 1 ? 'lead' : 'leads'}</span> will be saved along with your search.
+                    <span className="font-medium text-slate-700">{leadCount} {leadCount === 1 ? 'lead' : 'leads'}</span> {description}
                 </p>
 
                 <div className="mt-6">
@@ -65,7 +66,7 @@ export default function SaveLeadListModal({ leads, searchQuery, searchedAt, onCl
                     <form onSubmit={handleSubmit} noValidate className="space-y-5">
                         <InputField id="name" name="name" label="List name" icon={Tag} placeholder="e.g. Software companies in Stockholm" maxLength={100} autoFocus required error={errors.name?.[0]} />
 
-                        <SubmitButton loading={loading}>Save list</SubmitButton>
+                        <SubmitButton loading={loading}>{submitLabel}</SubmitButton>
                     </form>
                 </div>
 

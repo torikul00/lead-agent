@@ -39,11 +39,14 @@ const normalizeName = (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').t
 // "JosÃ© GarcÃ­a" -> "jose garcia", so the same person from two sources matches
 export const normalizePersonName = (name) => normalizeName(name.normalize('NFD').replace(/\p{M}/gu, ''));
 
-// One lead per company: by domain, or by name + country when there's no domain
+// What makes two leads the same company: the domain, or name + country when there's no domain
+export const getLeadKey = (lead) => lead.domain ?? `${normalizeName(lead.name)}|${lead.country}`;
+
+// One lead per company
 export const dedupeLeads = (leads) => {
     const unique = new Map();
     for (const lead of leads) {
-        const key = lead.domain ?? `${normalizeName(lead.name)}|${lead.country}`;
+        const key = getLeadKey(lead);
         if (!unique.has(key)) unique.set(key, lead);
     }
     return [...unique.values()];

@@ -1,6 +1,6 @@
 import { Schema, model } from 'mongoose';
 
-// A named set of leads the user saved, with the search that found them
+// A named set of leads the user saved, with the search that found them; lists made on the Leads page have no search
 const leadListSchema = new Schema({
     user_id: {
         type: Schema.Types.ObjectId,
@@ -23,7 +23,7 @@ const leadListSchema = new Schema({
     },
     searched_at: {
         type: Date,
-        required: true,
+        default: null,
     },
     lead_count: {
         type: Number,

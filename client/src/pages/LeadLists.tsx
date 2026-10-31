@@ -111,7 +111,7 @@ export default function LeadLists() {
             {deletingList && (
                 <ConfirmationModal
                     title="Delete list"
-                    message={`Are you sure you want to delete "${deletingList.name}"? This will permanently remove the list and all its leads.`}
+                    message={`Are you sure you want to delete "${deletingList.name}"? This will permanently remove the list and its leads, except leads that are also in another list.`}
                     confirmLabel="Delete list"
                     loading={deleteLoading}
                     onConfirm={handleDelete}

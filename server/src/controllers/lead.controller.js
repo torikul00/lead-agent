@@ -9,7 +9,7 @@ import { ENRICHERS } from '../enrichers/index.js';
 import hunter from '../enrichers/hunter.enricher.js';
 import { searchCities } from '../sources/geoapify.source.js';
 import { LEADS_PAGE_SIZE, MAX_COMPANY_EMAILS, SHORTLIST_SIZE } from '../../utils/constants.js';
-import { checkMx, countEmails, dedupeLeads, escapeRegex, normalizeDomain, rankLeads } from '../../utils/helper.js';
+import { checkMx, countEmails, dedupeLeads, escapeRegex, getLeadKey, normalizeDomain, rankLeads } from '../../utils/helper.js';
 
 // POST /api/leads/generate_leads â€” find companies from the selected sources and return the top matches with their decision makers.
 export const generateLeads = async (req, res) => {
@@ -124,16 +124,29 @@ const formatLeadList = (list) => ({
     created_at: list.createdAt,
 });
 
+// Take a list off its leads; a lead left in no list is removed
+const removeListFromLeads = async (listId, userId) => {
+    await Lead.updateMany({ lead_list_ids: listId }, { $pull: { lead_list_ids: listId } });
+    await Lead.deleteMany({ user_id: userId, lead_list_ids: { $size: 0 } });
+};
+
 // POST /api/leads/save_list â€” save the chosen leads as a named list, along with the search that found them
 export const saveLeadList = async (req, res) => {
     try {
         const { name, search_query, searched_at, leads } = req.body;
         const list = await LeadList.create({ user_id: req.user._id, name, search_query, searched_at, lead_count: leads.length });
 
-        // Remove the list again if its leads can't be saved, so no empty list is left behind
+        // A company the user already saved stays one lead and joins this list; if saving fails the list is removed again, so no empty list is left behind
         try {
-            await Lead.insertMany(leads.map((lead) => ({ ...lead, user_id: req.user._id, lead_list_id: list._id, category_id: null })));
+            const savedLeads = await Lead.find({ user_id: req.user._id }).select('domain name country').lean();
+            const savedIds = new Map(savedLeads.map((lead) => [getLeadKey(lead), lead._id]));
+            const existingIds = leads.map((lead) => savedIds.get(getLeadKey(lead))).filter(Boolean);
+            const newLeads = leads.filter((lead) => !savedIds.has(getLeadKey(lead)));
+
+            await Lead.updateMany({ _id: { $in: existingIds } }, { $addToSet: { lead_list_ids: list._id } });
+            await Lead.insertMany(newLeads.map((lead) => ({ ...lead, user_id: req.user._id, lead_list_ids: [list._id], category_id: null })));
         } catch (err) {
+            await removeListFromLeads(list._id, req.user._id);
             await LeadList.deleteOne({ _id: list._id });
             throw err;
         }
@@ -142,6 +155,31 @@ export const saveLeadList = async (req, res) => {
     } catch (err) {
         console.error('Saving lead list failed:', err);
         return res.status(500).json({ error: 'Could not save the list right now. Please try again.' });
+    }
+};
+
+// POST /api/leads/create_list — make a new list from leads the user already saved; they stay in their other lists too
+export const createLeadList = async (req, res) => {
+    try {
+        const { name, lead_ids: leadIds } = req.body;
+
+        const leads = await Lead.find({ _id: { $in: leadIds }, user_id: req.user._id }).select('_id').lean();
+        if (!leads.length) return res.status(404).json({ error: 'Leads not found.' });
+
+        const list = await LeadList.create({ user_id: req.user._id, name, lead_count: leads.length });
+
+        // Remove the list again if its leads can't be added, so no empty list is left behind
+        try {
+            await Lead.updateMany({ _id: { $in: leads.map((lead) => lead._id) } }, { $addToSet: { lead_list_ids: list._id } });
+        } catch (err) {
+            await LeadList.deleteOne({ _id: list._id });
+            throw err;
+        }
+
+        return res.status(201).json({ list: formatLeadList(list) });
+    } catch (err) {
+        console.error('Creating lead list failed:', err);
+        return res.status(500).json({ error: 'Could not create the list right now. Please try again.' });
     }
 };
 
@@ -156,13 +194,13 @@ export const getLeadLists = async (req, res) => {
     }
 };
 
-// DELETE /api/leads/lists/:id â€” remove a list and all its leads
+// DELETE /api/leads/lists/:id â€” remove a list, and its leads unless they're also in another list
 export const deleteLeadList = async (req, res) => {
     try {
         const list = isValidObjectId(req.params.id) && await LeadList.findOneAndDelete({ _id: req.params.id, user_id: req.user._id }).lean();
         if (!list) return res.status(404).json({ error: 'List not found.' });
 
-        await Lead.deleteMany({ lead_list_id: list._id });
+        await removeListFromLeads(list._id, req.user._id);
         return res.status(200).json({ message: 'List deleted.' });
     } catch (err) {
         console.error('Deleting lead list failed:', err);
@@ -178,7 +216,7 @@ export const getLeadList = async (req, res) => {
             return res.status(404).json({ error: 'List not found.' });
         }
 
-        const leads = await Lead.find({ lead_list_id: list._id }).sort({ score: -1, _id: 1 }).populate('category_id', 'name color').select('-user_id -lead_list_id -__v').lean();
+        const leads = await Lead.find({ lead_list_ids: list._id }).sort({ score: -1, _id: 1 }).populate('category_id', 'name color').select('-user_id -lead_list_ids -__v').lean();
         const formattedLeads = leads.map((lead) => ({ ...lead, id: lead._id }));
         return res.status(200).json({ list: formatLeadList(list), leads: formattedLeads });
     } catch (err) {
@@ -217,7 +255,7 @@ export const getLeads = async (req, res) => {
         const requestedPage = Math.max(Number.parseInt(req.query.page, 10) || 1, 1);
         const page = Math.min(requestedPage, totalPages || 1);
 
-        const leads = await Lead.find(query).sort({ score: -1, _id: 1 }).skip((page - 1) * LEADS_PAGE_SIZE).limit(LEADS_PAGE_SIZE).populate('category_id', 'name color').select('-user_id -lead_list_id -__v').lean();
+        const leads = await Lead.find(query).sort({ score: -1, _id: 1 }).skip((page - 1) * LEADS_PAGE_SIZE).limit(LEADS_PAGE_SIZE).populate('category_id', 'name color').select('-user_id -lead_list_ids -__v').lean();
         const formattedLeads = leads.map((lead) => ({ ...lead, id: lead._id }));
         return res.status(200).json({ leads: formattedLeads, total, page, total_pages: totalPages });
     } catch (err) {
@@ -230,7 +268,7 @@ export const getLeads = async (req, res) => {
 export const exportLeads = async (req, res) => {
     try {
         const query = await buildLeadsQuery(req.user._id, req.query);
-        const leads = await Lead.find(query).sort({ score: -1, _id: 1 }).select('-user_id -lead_list_id -__v').lean();
+        const leads = await Lead.find(query).sort({ score: -1, _id: 1 }).select('-user_id -lead_list_ids -__v').lean();
         return res.status(200).json({ leads });
     } catch (err) {
         console.error('Exporting leads failed:', err);
@@ -241,7 +279,7 @@ export const exportLeads = async (req, res) => {
 // DELETE /api/leads/:id — remove a lead with its conversations and their emails from LeadAgent; the mailbox itself isn't touched
 export const deleteLead = async (req, res) => {
     try {
-        const lead = isValidObjectId(req.params.id) && await Lead.findOne({ _id: req.params.id, user_id: req.user._id }).lean();
+        const lead = isValidObjectId(req.params.id) && await Lead.findOne({ _id: req.params.id, user_id: req.user._id });
         if (!lead) return res.status(404).json({ error: 'Lead not found.' });
 
         // The lead goes last, so a failed delete can be tried again without leaving conversations behind
@@ -249,7 +287,7 @@ export const deleteLead = async (req, res) => {
         await EmailMessage.deleteMany({ conversation_id: { $in: conversationIds } });
         await Conversation.deleteMany({ _id: { $in: conversationIds } });
         await Lead.deleteOne({ _id: lead._id });
-        await LeadList.updateOne({ _id: lead.lead_list_id }, { $inc: { lead_count: -1 } });
+        await LeadList.updateMany({ _id: { $in: lead.lead_list_ids } }, { $inc: { lead_count: -1 } });
 
         return res.status(200).json({ message: 'Lead deleted.' });
     } catch (err) {

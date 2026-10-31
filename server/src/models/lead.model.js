@@ -17,17 +17,16 @@ const companyEmailSchema = new Schema({
     source_url: String,
 }, { _id: false });
 
-// A lead saved into a list, stored as the search returned it
+// A saved company, stored as the search returned it; one lead can be in several lists
 const leadSchema = new Schema({
     user_id: {
         type: Schema.Types.ObjectId,
         ref: 'User',
         required: true,
     },
-    lead_list_id: {
-        type: Schema.Types.ObjectId,
-        ref: 'LeadList',
-        required: true,
+    lead_list_ids: {
+        type: [{ type: Schema.Types.ObjectId, ref: 'LeadList' }],
+        default: [],
     },
     category_id: {
         type: Schema.Types.ObjectId,
@@ -117,7 +116,7 @@ const leadSchema = new Schema({
     },
 }, { timestamps: true });
 
-leadSchema.index({ lead_list_id: 1, score: -1 });
+leadSchema.index({ lead_list_ids: 1, score: -1 });
 leadSchema.index({ user_id: 1, domain: 1 });
 
 const Lead = model('Lead', leadSchema);

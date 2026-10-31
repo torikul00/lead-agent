@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight, Download, LoaderCircle, Search, Users } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download, ListPlus, LoaderCircle, Search, Users } from 'lucide-react'
 import Select from 'react-select'
 import api from '@/lib/axios.ts'
 import getErrorMessage from '@/lib/getErrorMessage.ts'
@@ -10,6 +10,7 @@ import ConfirmationModal from '@/components/ConfirmationModal.tsx'
 import LeadsTable from '@/components/leads/LeadsTable.tsx'
 import LeadDetailsModal from '@/components/leads/LeadDetailsModal.tsx'
 import ExportLeadsModal from '@/components/leads/ExportLeadsModal.tsx'
+import SaveLeadListModal from '@/components/leads/SaveLeadListModal.tsx'
 import type { Category, Lead } from '@/types/index.ts'
 
 type CategoryFilterOption = {
@@ -79,6 +80,8 @@ export default function Leads() {
     const [exporting, setExporting] = useState(false)
     const [error, setError] = useState('')
     const [selected, setSelected] = useState<string[]>([])
+    const [creatingList, setCreatingList] = useState(false)
+    const [savedMessage, setSavedMessage] = useState('')
     const [viewingLead, setViewingLead] = useState<Lead | null>(null)
     const [deletingLead, setDeletingLead] = useState<Lead | null>(null)
     const [deleteLoading, setDeleteLoading] = useState(false)
@@ -118,6 +121,7 @@ export default function Leads() {
     const applyFilters = (changes: Partial<typeof filters>) => {
         setLoading(true)
         setError('')
+        setSavedMessage('')
         setFilters((current) => ({ ...current, ...changes }))
     }
 
@@ -156,6 +160,12 @@ export default function Leads() {
         }
     }
 
+    const handleListCreated = (name: string) => {
+        setCreatingList(false)
+        setSelected([])
+        setSavedMessage(`Created "${name}" with ${selected.length} ${selected.length === 1 ? 'lead' : 'leads'}.`)
+    }
+
     // Exports every lead matching the filters, not only the page on screen
     const handleExport = async () => {
         setExporting(true)
@@ -188,7 +198,7 @@ export default function Leads() {
                     <p className="mt-1 text-sm text-slate-500">All the leads saved in your lists.</p>
                 </div>
 
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center lg:justify-end">
                     <label className="relative">
                         <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
                         <input
@@ -216,6 +226,10 @@ export default function Leads() {
                             </span>
                         )}
                     />
+                    <button type="button" onClick={() => setCreatingList(true)} disabled={!selected.length} className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50">
+                        <ListPlus className="size-4" />
+                        Create List
+                    </button>
                     <button type="button" onClick={() => setExportOpen(true)} disabled={!total} className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">
                         <Download className="size-4" />
                         Export
@@ -224,6 +238,7 @@ export default function Leads() {
             </div>
 
             {error && <FormAlert message={error} />}
+            {savedMessage && <FormAlert type="success" message={savedMessage} />}
 
             {loading && !leads.length && (
                 <div className="flex justify-center rounded-2xl border border-slate-200 bg-white px-6 py-16">
@@ -266,11 +281,23 @@ export default function Leads() {
             {deletingLead && (
                 <ConfirmationModal
                     title="Delete lead"
-                    message={`Delete "${deletingLead.name}"? This permanently removes the lead and its conversations from LeadAgent; the emails stay in your mailbox.`}
+                    message={`Delete "${deletingLead.name}"? This permanently removes the lead from all its lists, along with its conversations; the emails stay in your mailbox.`}
                     confirmLabel="Delete lead"
                     loading={deleteLoading}
                     onConfirm={handleDelete}
                     onClose={() => setDeletingLead(null)}
+                />
+            )}
+
+            {creatingList && (
+                <SaveLeadListModal
+                    title="Create list"
+                    description="will be added to the new list."
+                    submitLabel="Create list"
+                    leadCount={selected.length}
+                    onSave={(name) => api.post('/leads/create_list', { name, lead_ids: selected })}
+                    onClose={() => setCreatingList(false)}
+                    onSaved={handleListCreated}
                 />
             )}
 

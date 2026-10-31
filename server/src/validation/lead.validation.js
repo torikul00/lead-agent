@@ -91,8 +91,19 @@ export const addCompanyEmailSchema = z.object({
     email: z.string().trim().toLowerCase().min(1, 'Email is required').pipe(z.email('Enter a valid email address')),
 });
 
+const listName = z.string().trim().min(1, 'List name is required').max(100, 'List name must be 100 characters or less');
+
+// A new list made from leads that are already saved
+export const createLeadListSchema = z.object({
+    name: listName,
+    lead_ids: z
+        .array(z.string().regex(/^[a-f\d]{24}$/i, 'Invalid lead'))
+        .min(1, 'Choose at least one lead')
+        .transform((ids) => [...new Set(ids)]),
+});
+
 export const saveLeadListSchema = z.object({
-    name: z.string().trim().min(1, 'List name is required').max(100, 'List name must be 100 characters or less'),
+    name: listName,
     search_query: generateLeadsSchema,
     searched_at: z.coerce.date('Search time is invalid'),
     leads: z.array(savedLeadSchema).min(1, 'Choose at least one lead to save').max(MAX_LEADS, `You can save up to ${MAX_LEADS} leads`),
