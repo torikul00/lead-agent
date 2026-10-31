@@ -14,6 +14,7 @@ import Signup from '@/pages/Signup.tsx'
 import Categories from '@/pages/Categories.tsx'
 import Settings from '@/pages/Settings.tsx'
 import Inbox from '@/pages/Inbox.tsx'
+import MailSender from '@/pages/MailSender.tsx'
 
 export default function AppRouter() {
     return (
@@ -33,6 +34,7 @@ export default function AppRouter() {
                         <Route path="/profile" element={<Profile />} />
                         <Route path="/settings" element={<Settings />} />
                         <Route path="/inbox" element={<Inbox />} />
+                        <Route path="/mail-sender" element={<MailSender />} />
                     </Route>
                 </Route>
 

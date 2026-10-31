@@ -203,14 +203,15 @@ export const sendBulkEmailToLead = async (req, res) => {
 
         const leads = await Lead.find({ _id: { $in: leadIds }, user_id: req.user._id }).lean();
 
-        // Leads that weren't found or have no email are skipped
-        const result = { sent: 0, skipped: leadIds.length - leads.length, failed: 0 };
+        // Leads that weren't found or have no email are skipped; the names show the user who didn't get the email
+        const result = { sent: 0, skipped: leadIds.length - leads.length, failed: 0, skipped_leads: [], failed_leads: [] };
 
         // One at a time, so a big batch doesn't run into the provider's rate limits
         for (const lead of leads) {
             const email = chooseLeadEmail(lead);
             if (!email) {
                 result.skipped++;
+                result.skipped_leads.push(lead.name);
                 continue;
             }
 
@@ -251,6 +252,7 @@ export const sendBulkEmailToLead = async (req, res) => {
             } catch (err) {
                 console.error(`Emailing lead ${lead._id} failed:`, err);
                 result.failed++;
+                result.failed_leads.push(lead.name);
 
                 // The mailbox's login stopped working, so the other emails would fail too
                 if (mailbox.status === 'disconnected') break;
